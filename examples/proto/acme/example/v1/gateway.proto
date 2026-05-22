@@ -1,0 +1,111 @@
+// acme.example.v1 — gateway and relay services (streaming-heavy, no Mermaid here).
+//
+// Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit. This file
+// complements `echo.proto` with **client-streaming**, **server-streaming**, and **bidi**
+// RPCs so generated docs show every arrow style in method signatures.
+syntax = "proto3";
+
+package acme.example.v1;
+
+import "acme/example/v2/catalog.proto";
+import "acme/example/v2/types.proto";
+import "google/protobuf/timestamp.proto";
+
+// RelayFrame is one unit in a bidirectional relay stream.
+message RelayFrame {
+  uint64 sequence = 1;
+  bytes payload = 2;
+  acme.example.v2.SharedMetadata metadata = 3;
+  bool fin = 4;
+}
+
+// RelayOpen carries handshake metadata for RelayConnect.
+message RelayOpen {
+  string session_name = 1;
+  acme.example.v2.ResourceIdentity identity = 2;
+  acme.example.v2.QuotaLimits requested_limits = 3;
+  repeated acme.example.v2.Label labels = 4;
+}
+
+// RelayAck confirms a relay session is ready.
+message RelayAck {
+  string session_id = 1;
+  google.protobuf.Timestamp opened_at = 2;
+  acme.example.v2.AggregateHealth health = 3;
+}
+
+// RelayClose ends a relay session gracefully.
+message RelayClose {
+  string session_id = 1;
+  string reason = 2;
+}
+
+// RelayConnectRequest is one client-to-server frame in RelayConnect.
+message RelayConnectRequest {
+  oneof payload {
+    RelayOpen open = 1;
+    RelayFrame frame = 2;
+    RelayClose close = 3;
+  }
+}
+
+// RelayConnectResponse is one server-to-client frame in RelayConnect.
+message RelayConnectResponse {
+  oneof payload {
+    RelayAck ack = 1;
+    RelayFrame frame = 2;
+    RelayClose close = 3;
+  }
+}
+
+// PublishEventsRequest is one client-streaming upload chunk.
+message PublishEventsRequest {
+  string event_type = 1;
+  acme.example.v2.PayloadEnvelope envelope = 2;
+  google.protobuf.Timestamp client_time = 3;
+}
+
+// PublishEventsResponse acknowledges a published event stream.
+message PublishEventsResponse {
+  string event_id = 1;
+  acme.example.v2.StreamCursor cursor = 2;
+}
+
+// ListCatalogProductsRequest wraps the v2 catalog list request.
+message ListCatalogProductsRequest {
+  acme.example.v2.ListProductsRequest request = 1;
+}
+
+// ListCatalogProductsResponse wraps the v2 catalog list response.
+message ListCatalogProductsResponse {
+  acme.example.v2.ListProductsResponse response = 1;
+}
+
+// RotateKeysRequest triggers a long-running operation example.
+message RotateKeysRequest {
+  acme.example.v2.TenantRef tenant = 1;
+  bool dry_run = 2;
+}
+
+// RotateKeysResponse returns an operation handle.
+message RotateKeysResponse {
+  acme.example.v2.LongRunningOperation operation = 1;
+}
+
+// GatewayService focuses on streaming patterns and catalog adjacency.
+service GatewayService {
+  // RelayConnect opens a bidirectional stream for frame exchange.
+  rpc RelayConnect(stream RelayConnectRequest) returns (stream RelayConnectResponse);
+
+  // PublishEvents accepts a client stream of PublishEventsRequest messages.
+  rpc PublishEvents(stream PublishEventsRequest) returns (PublishEventsResponse);
+
+  // ListCatalogProducts bridges to v2 catalog types for cross-package links.
+  rpc ListCatalogProducts(ListCatalogProductsRequest) returns (ListCatalogProductsResponse);
+}
+
+// AdminService documents infrequent control-plane RPCs.
+service AdminService {
+  // RotateKeys starts a synthetic long-running operation.
+  rpc RotateKeys(RotateKeysRequest) returns (RotateKeysResponse);
+}

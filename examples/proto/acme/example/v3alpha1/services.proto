@@ -1,0 +1,130 @@
+// acme.example.v3alpha1 — alpha services for flags, experiments, and pipelines.
+//
+// At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis
+// praesentium voluptatum. Services mirror v2 streaming patterns while linking
+// back to `acme.example.v1` gateway narratives through shared v2 types.
+//
+// No Mermaid diagrams here (see `acme.example.v1`).
+syntax = "proto3";
+
+package acme.example.v3alpha1;
+
+import "acme/example/v2/types.proto";
+import "acme/example/v3alpha1/pipeline.proto";
+import "acme/example/v3alpha1/types.proto";
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// ListFeatureFlagsRequest paginates feature flags for a tenant.
+message ListFeatureFlagsRequest {
+  acme.example.v2.ListOptions options = 1;
+  acme.example.v2.TenantRef tenant = 2;
+  ReleaseChannel channel_filter = 3;
+}
+
+// ListFeatureFlagsResponse returns a page of flags.
+message ListFeatureFlagsResponse {
+  repeated FeatureFlag flags = 1;
+  acme.example.v2.PageResult page = 2;
+}
+
+// UpsertFlagOverrideRequest writes a tenant-specific override.
+message UpsertFlagOverrideRequest {
+  FlagOverride override = 1;
+}
+
+// UpsertFlagOverrideResponse echoes the stored override.
+message UpsertFlagOverrideResponse {
+  FlagOverride override = 1;
+}
+
+// AssignExperimentRequest assigns a subject to an experiment arm.
+message AssignExperimentRequest {
+  ExperimentSpec spec = 1;
+  SubjectRef subject = 2;
+  repeated string exclusion_keys = 3 [(buf.validate.field).repeated.max_items = 32];
+}
+
+// AssignExperimentResponse returns the assignment row.
+message AssignExperimentResponse {
+  ExperimentAssignment assignment = 1;
+}
+
+// StreamAssignmentsRequest opens a server stream of assignment events.
+message StreamAssignmentsRequest {
+  string experiment_id = 1 [(buf.validate.field).string.uuid = true];
+  acme.example.v2.TimeWindow window = 2;
+}
+
+// StreamAssignmentsResponse is one assignment event on the stream.
+message StreamAssignmentsResponse {
+  ExperimentAssignment assignment = 1;
+  acme.example.v2.StreamCursor cursor = 2;
+  google.protobuf.Timestamp observed_at = 3;
+}
+
+// PublishHintsRequest is one client-streaming platform hint chunk.
+message PublishHintsRequest {
+  string batch_id = 1;
+  PlatformHint hint = 2;
+  uint32 part_index = 3;
+  bool last_part = 4;
+}
+
+// PublishHintsResponse aggregates uploaded hint parts.
+message PublishHintsResponse {
+  string batch_id = 1;
+  uint32 parts_received = 2;
+  acme.example.v2.PageResult page = 3;
+}
+
+// SyncFlagsRequest is one frame in a bidirectional flag sync session.
+message SyncFlagsRequest {
+  uint64 sequence = 1;
+  FeatureFlag flag = 2;
+  bool fin = 3;
+}
+
+// SyncFlagsResponse mirrors a bidirectional flag sync frame.
+message SyncFlagsResponse {
+  uint64 sequence = 1;
+  acme.example.v2.StreamCursor cursor = 2;
+  acme.example.v2.ErrorDetail error = 3;
+  bool fin = 4;
+}
+
+// FeatureFlagService documents flag and override RPCs.
+service FeatureFlagService {
+  // ListFeatureFlags returns a paginated flag catalog page.
+  rpc ListFeatureFlags(ListFeatureFlagsRequest) returns (ListFeatureFlagsResponse);
+
+  // UpsertFlagOverride stores a tenant override row.
+  rpc UpsertFlagOverride(UpsertFlagOverrideRequest) returns (UpsertFlagOverrideResponse);
+
+  // PublishHints accepts a client stream of platform hints.
+  rpc PublishHints(stream PublishHintsRequest) returns (PublishHintsResponse);
+
+  // SyncFlags synchronizes flag revisions over a bidirectional stream.
+  rpc SyncFlags(stream SyncFlagsRequest) returns (stream SyncFlagsResponse);
+}
+
+// ExperimentService documents assignment and streaming experiment RPCs.
+service ExperimentService {
+  // AssignExperiment picks an arm for a subject.
+  rpc AssignExperiment(AssignExperimentRequest) returns (AssignExperimentResponse);
+
+  // StreamAssignments pushes assignment events for an experiment.
+  rpc StreamAssignments(StreamAssignmentsRequest) returns (stream StreamAssignmentsResponse);
+}
+
+// PipelineService documents orchestration RPCs in the alpha package.
+service PipelineService {
+  // StartPipeline creates a pipeline run from staged inputs.
+  rpc StartPipeline(StartPipelineRequest) returns (StartPipelineResponse);
+
+  // WatchPipeline streams step results for a run.
+  rpc WatchPipeline(WatchPipelineRequest) returns (stream WatchPipelineResponse);
+
+  // CancelPipeline stops a run by identifier.
+  rpc CancelPipeline(CancelPipelineRequest) returns (CancelPipelineResponse);
+}

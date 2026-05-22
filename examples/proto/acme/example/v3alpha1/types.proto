@@ -1,0 +1,119 @@
+// acme.example.v3alpha1 — alpha platform vocabulary for documentation fixtures.
+//
+// Lorem ipsum dolor sit amet, consectetur adipiscing elit. This package adds
+// **feature flags**, **experiments**, and **release channels** on top of
+// `acme.example.v2` shared types. Protovalidate annotations demonstrate how
+// constraints appear in generated protobuf fences.
+//
+// | Concern | Types |
+// |---------|-------|
+// | Flags | FeatureFlag, FlagOverride |
+// | Experiments | ExperimentSpec, ExperimentArm |
+// | Channels | ReleaseChannel |
+//
+// No Mermaid diagrams here (see `acme.example.v1`).
+syntax = "proto3";
+
+package acme.example.v3alpha1;
+
+import "acme/example/v2/types.proto";
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// ReleaseChannel classifies how aggressively a flag rolls out.
+enum ReleaseChannel {
+  RELEASE_CHANNEL_UNSPECIFIED = 0;
+  RELEASE_CHANNEL_INTERNAL = 1;
+  RELEASE_CHANNEL_CANARY = 2;
+  RELEASE_CHANNEL_STABLE = 3;
+}
+
+// FeatureFlag describes a toggle evaluated by fictional clients.
+message FeatureFlag {
+  // Stable identifier (slug).
+  string key = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 128,
+    (buf.validate.field).string.pattern = "^[a-z][a-z0-9_.-]*$"
+  ];
+  string display_name = 2 [(buf.validate.field).string.max_len = 256];
+  string description = 3;
+  bool default_enabled = 4;
+  ReleaseChannel channel = 5;
+  acme.example.v2.SharedMetadata metadata = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+// FlagOverride pins a flag value for one tenant.
+message FlagOverride {
+  acme.example.v2.TenantRef tenant = 1;
+  string flag_key = 2 [(buf.validate.field).string.min_len = 1];
+  bool enabled = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+// ExperimentArm is one variant in an A/B style experiment.
+message ExperimentArm {
+  string arm_id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.pattern = "^arm_[a-z0-9]+$"
+  ];
+  string label = 2 [(buf.validate.field).string.max_len = 64];
+  uint32 weight_basis_points = 3 [
+    (buf.validate.field).uint32.gte = 0,
+    (buf.validate.field).uint32.lte = 10000
+  ];
+  map<string, string> parameters = 4;
+}
+
+// ExperimentSpec defines arms and eligibility for assignment RPCs.
+message ExperimentSpec {
+  string experiment_id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+  string hypothesis = 2;
+  repeated ExperimentArm arms = 3 [(buf.validate.field).repeated.min_items = 2];
+  acme.example.v2.TimeWindow enrollment_window = 4;
+  acme.example.v2.LabelSet audience = 5;
+
+  option (buf.validate.message).cel = {
+    id: "experiment.arms_weights_positive"
+    message: "each arm must have positive weight in basis points"
+    expression: "this.arms.all(arm, arm.weight_basis_points > 0u)"
+  };
+}
+
+// ExperimentAssignment records which arm a subject received.
+message ExperimentAssignment {
+  string experiment_id = 1;
+  string subject_id = 2 [(buf.validate.field).string.min_len = 1];
+  string arm_id = 3;
+  google.protobuf.Timestamp assigned_at = 4;
+  acme.example.v2.TraceContext trace = 5;
+}
+
+// SubjectRef identifies a user or device for experiment assignment.
+message SubjectRef {
+  oneof identity {
+    string user_id = 1 [(buf.validate.field).string.uuid = true];
+    string device_id = 2 [(buf.validate.field).string.min_len = 8];
+  }
+  acme.example.v2.TenantRef tenant = 3;
+}
+
+// RolloutStage documents progressive delivery for pipeline stories.
+message RolloutStage {
+  ReleaseChannel channel = 1;
+  google.protobuf.Duration bake_time = 2;
+  uint32 max_parallel = 3 [(buf.validate.field).uint32.lte = 1000];
+}
+
+// PlatformHint links alpha metadata back into v2 envelopes.
+message PlatformHint {
+  string hint_id = 1;
+  acme.example.v2.PayloadEnvelope envelope = 2;
+  repeated acme.example.v2.Label labels = 3;
+}

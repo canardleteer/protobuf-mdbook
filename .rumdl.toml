@@ -1,0 +1,7 @@
+[global]
+line-length = 80
+
+[MD013]
+reflow = true
+code-blocks = false
+tables = false

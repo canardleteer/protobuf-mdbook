@@ -1,0 +1,104 @@
+// acme.example.v2.catalog — fictional commerce types for link and enum coverage.
+//
+// At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium
+// voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint.
+//
+// Cross-package links: consumed from `acme.example.v1` gateway wrappers, from
+// `CatalogService` in `services.proto`, and from `SharedMetadata` in `types.proto`.
+syntax = "proto3";
+
+package acme.example.v2;
+
+import "acme/example/v2/types.proto";
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// ProductSku identifies a sellable item in documentation tables.
+message ProductSku {
+  string sku = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64
+  ];
+  string title = 2;
+  string description = 3;
+  Money price = 4;
+  ProductStatus status = 5;
+  repeated Label labels = 6;
+}
+
+// Money represents a decimal amount with currency code.
+message Money {
+  int64 units = 1;
+  int32 nanos = 2;
+  string currency_code = 3 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.len = 3
+  ];
+}
+
+// ProductStatus lifecycle for catalog stories.
+enum ProductStatus {
+  PRODUCT_STATUS_UNSPECIFIED = 0;
+  PRODUCT_STATUS_DRAFT = 1;
+  PRODUCT_STATUS_ACTIVE = 2;
+  PRODUCT_STATUS_ARCHIVED = 3;
+  PRODUCT_STATUS_DISCONTINUED = 4;
+}
+
+// Product bundles many SKUs for list RPC examples.
+message Product {
+  string product_id = 1;
+  string display_name = 2;
+  repeated ProductSku skus = 3;
+  TenantRef owner = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  Address warehouse = 7;
+}
+
+// ListProductsRequest paginates catalog inventory.
+message ListProductsRequest {
+  ListOptions options = 1;
+  ProductStatus status_filter = 2;
+  string search_query = 3 [(buf.validate.field).string.max_len = 256];
+}
+
+// ListProductsResponse returns a page of products.
+message ListProductsResponse {
+  repeated Product products = 1;
+  PageResult page = 2;
+}
+
+// GetProductRequest fetches a single product by id.
+message GetProductRequest {
+  string product_id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+
+// GetProductResponse returns one product.
+message GetProductResponse {
+  Product product = 1;
+}
+
+// InventoryAdjustment documents stock changes for admin RPCs.
+message InventoryAdjustment {
+  string sku = 1;
+  int64 delta = 2;
+  string reason = 3;
+  google.protobuf.Timestamp adjusted_at = 4;
+}
+
+// ApplyInventoryAdjustmentsRequest batches adjustments.
+message ApplyInventoryAdjustmentsRequest {
+  repeated InventoryAdjustment adjustments = 1;
+  ResourceIdentity actor = 2;
+}
+
+// ApplyInventoryAdjustmentsResponse summarizes applied rows.
+message ApplyInventoryAdjustmentsResponse {
+  uint32 applied = 1;
+  repeated ErrorDetail failures = 2;
+}

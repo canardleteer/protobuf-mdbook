@@ -1,0 +1,22 @@
+[package]
+name = "protoc-gen-mdbook-xtask"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "protoc-gen-mdbook-xtask"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+protoc-bin-vendored.workspace = true
+protoc-gen-mdbook = { path = ".." }
+serde_json.workspace = true
+tempfile.workspace = true
+
+[build-dependencies]
+protoc-bin-vendored.workspace = true

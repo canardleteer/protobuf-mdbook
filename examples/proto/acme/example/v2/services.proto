@@ -1,0 +1,148 @@
+// acme.example.v2 — services for catalog, inventory, and platform telemetry fixtures.
+//
+// Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae
+// consequatur. Services live in v2 so `acme.example.v1` can link inward via gateway wrappers
+// while package docs show a full API surface per protobuf package.
+//
+// No Mermaid diagrams here (see `acme.example.v1` for diagrams).
+syntax = "proto3";
+
+package acme.example.v2;
+
+import "acme/example/v2/catalog.proto";
+import "acme/example/v2/types.proto";
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// WatchInventoryRequest subscribes to inventory change events.
+message WatchInventoryRequest {
+  string warehouse_id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 128
+  ];
+  TimeWindow window = 2;
+  repeated FilterExpression filters = 3;
+}
+
+// WatchInventoryResponse is one event on the WatchInventory server stream.
+message WatchInventoryResponse {
+  string event_id = 1;
+  InventoryAdjustment adjustment = 2;
+  google.protobuf.Timestamp observed_at = 3;
+  StreamCursor cursor = 4;
+}
+
+// UploadDraftsRequest is one client-streaming product draft chunk.
+message UploadDraftsRequest {
+  string draft_id = 1;
+  ProductSku sku = 2;
+  uint32 part_index = 3;
+  bool last_part = 4;
+}
+
+// UploadDraftsResponse aggregates uploaded draft parts.
+message UploadDraftsResponse {
+  string draft_id = 1;
+  uint32 parts_received = 2;
+  Product product = 3;
+}
+
+// SyncCatalogRequest is one frame in a bidirectional catalog sync session.
+message SyncCatalogRequest {
+  uint64 sequence = 1;
+  string catalog_revision = 2;
+  PayloadEnvelope payload = 3;
+  bool fin = 4;
+}
+
+// SyncCatalogResponse mirrors a bidirectional catalog sync frame.
+message SyncCatalogResponse {
+  uint64 sequence = 1;
+  StreamCursor cursor = 2;
+  ErrorDetail error = 3;
+  bool fin = 4;
+}
+
+// ExportAuditBatchRequest exports a batch of audit rows (unary).
+message ExportAuditBatchRequest {
+  ResourceIdentity identity = 1;
+  TimeWindow window = 2;
+  ListOptions options = 3;
+}
+
+// ExportAuditBatchResponse returns exported audit data.
+message ExportAuditBatchResponse {
+  AuditBatch batch = 1;
+  PageResult page = 2;
+}
+
+// StreamAuditRecordsRequest opens a server stream of audit rows.
+message StreamAuditRecordsRequest {
+  TenantRef tenant = 1;
+  repeated FilterExpression filters = 2;
+}
+
+// StreamAuditRecordsResponse is one audit row on the stream.
+message StreamAuditRecordsResponse {
+  AuditRecord record = 1;
+  StreamCursor cursor = 2;
+}
+
+// IngestTelemetryRequest is one client-streaming telemetry point.
+message IngestTelemetryRequest {
+  string metric_name = 1;
+  double value = 2;
+  google.protobuf.Timestamp observed_at = 3;
+  LabelSet labels = 4;
+}
+
+// IngestTelemetryResponse acknowledges ingested points.
+message IngestTelemetryResponse {
+  uint64 accepted = 1;
+  uint64 rejected = 2;
+}
+
+// GetAggregateHealthRequest is an empty platform health request.
+message GetAggregateHealthRequest {}
+
+// GetAggregateHealthResponse returns rolled-up health from types.proto.
+message GetAggregateHealthResponse {
+  AggregateHealth health = 1;
+}
+
+// CatalogService documents commerce and inventory RPCs in the v2 package.
+service CatalogService {
+  // ListProducts returns a paginated product catalog page.
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+
+  // GetProduct fetches a single product by identifier.
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse);
+
+  // ApplyInventoryAdjustments applies batched stock deltas.
+  rpc ApplyInventoryAdjustments(ApplyInventoryAdjustmentsRequest) returns (ApplyInventoryAdjustmentsResponse);
+
+  // WatchInventory streams inventory adjustments for a warehouse.
+  rpc WatchInventory(WatchInventoryRequest) returns (stream WatchInventoryResponse);
+
+  // UploadDrafts accepts a client stream of draft SKU payloads.
+  rpc UploadDrafts(stream UploadDraftsRequest) returns (UploadDraftsResponse);
+
+  // SyncCatalog synchronizes catalog revisions over a bidirectional stream.
+  rpc SyncCatalog(stream SyncCatalogRequest) returns (stream SyncCatalogResponse);
+}
+
+// PlatformService documents cross-cutting telemetry and health RPCs.
+service PlatformService {
+  // ExportAuditBatch returns a snapshot of audit records (unary).
+  rpc ExportAuditBatch(ExportAuditBatchRequest) returns (ExportAuditBatchResponse);
+
+  // StreamAuditRecords pushes audit rows over a server stream.
+  rpc StreamAuditRecords(StreamAuditRecordsRequest) returns (stream StreamAuditRecordsResponse);
+
+  // IngestTelemetry accepts a client stream of metric samples.
+  rpc IngestTelemetry(stream IngestTelemetryRequest) returns (IngestTelemetryResponse);
+
+  // GetAggregateHealth returns synthetic component health.
+  rpc GetAggregateHealth(GetAggregateHealthRequest) returns (GetAggregateHealthResponse);
+}

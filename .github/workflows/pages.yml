@@ -1,0 +1,79 @@
+# Publish example api-book to GitHub Pages on pushes to main.
+name: pages
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: build api-book
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dsherret/rust-toolchain-file@v1
+
+      - name: Install Buf CLI
+        uses: bufbuild/buf-setup-action@v1.50.0
+        with:
+          version: "1.69.0"
+
+      - name: Cache Cargo registry and git
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            xtask
+          cache-on-failure: true
+
+      - name: Generate example mdBook at ./api-book
+        run: cargo xtask book-init
+
+      - name: Check generated markdown links
+        run: cargo xtask book-links
+
+      - name: Install mdBook (pinned to plugin)
+        run: cargo install mdbook --version 0.5.3 --locked
+
+      - name: Install mdbook-mermaid
+        run: cargo install mdbook-mermaid --locked
+
+      - name: Configure Mermaid preprocessor
+        run: mdbook-mermaid install api-book
+
+      - name: Set GitHub Pages site URL
+        run: |
+          echo 'site-url = "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"' >> api-book/book.toml
+
+      - name: Build static HTML
+        run: mdbook build api-book
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: api-book/book
+
+  deploy:
+    name: deploy GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

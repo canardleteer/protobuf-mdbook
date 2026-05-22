@@ -1,0 +1,23 @@
+Highlight.js — Protocol Buffers language (vendored fragment)
+============================================================
+
+Upstream: highlight.js 10.1.1
+  https://github.com/highlightjs/highlight.js/blob/10.1.1/src/languages/protobuf.js
+License: BSD-3-Clause
+  https://github.com/highlightjs/highlight.js/blob/main/LICENSE
+
+Bundled in this repository as `protobuf-10.js` for use with mdBook 0.5.x, which
+ships Highlight.js 10.1.1 in its default theme.
+
+Local modifications (see file header in protobuf-10.js):
+  - IIFE registering `protobuf` / alias `proto` on the global `hljs`
+  - Extra keywords: syntax, edition, extend, reserved, map, weak, public
+
+CEL language (repo-authored)
+============================
+
+File: `cel-10.js`
+License: Apache-2.0 (see file header)
+
+Authored for protoc-gen-mdbook. Highlights ```cel fences (Protovalidate message-level
+rules split from generated protobuf blocks). No upstream Highlight.js language file.
