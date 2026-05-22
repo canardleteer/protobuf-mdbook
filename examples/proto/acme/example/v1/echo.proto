@@ -1,0 +1,230 @@
+// acme.example.v1 — primary documentation fixture for protoc-gen-mdbook.
+//
+// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt
+// ut labore et dolore magna aliqua. This package exercises **CommonMark** in comments:
+// emphasis, `inline code`, tables, and cross-links into `acme.example.v2` types.
+//
+// | RPC | Streaming | Purpose |
+// |-----|-----------|---------|
+// | EchoUnary | unary | hello-world |
+// | EchoServerStream | server | chunk download |
+// | EchoClientStream | client | chunk upload |
+// | EchoBidiStream | bidi | live session |
+// | BatchEcho | unary | many payloads |
+// | WatchEcho | server | long watch |
+//
+// Mermaid diagrams for this repository live **only** in this package (not in v2).
+//
+// ```mermaid
+// flowchart TB
+//   subgraph clients [Clients]
+//     CLI[CLI]
+//     UI[Web UI]
+//   end
+//   subgraph v1 [acme.example.v1]
+//     ES[EchoService]
+//     GS[GatewayService]
+//   end
+//   subgraph v2 [acme.example.v2]
+//     TYPES[types.proto]
+//     CAT[catalog.proto]
+//   end
+//   CLI --> ES
+//   UI --> GS
+//   ES --> TYPES
+//   GS --> CAT
+// ```
+syntax = "proto3";
+
+package acme.example.v1;
+
+import "acme/example/v2/types.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// EchoUnaryRequest carries the unary payload.
+//
+// Fields reference `acme.example.v2.SharedMetadata` for trace identifiers.
+// See also `acme.example.v2.BatchRequest` for multi-item batch uploads.
+message EchoUnaryRequest {
+  // User-visible text to echo back.
+  //
+  // Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
+  // commodo consequat.
+  string message = 1;
+  acme.example.v2.SharedMetadata metadata = 2;
+  optional string locale = 3;
+  repeated string tags = 4;
+  acme.example.v2.EchoExtension extension = 5;
+}
+
+// EchoUnaryResponse returns the echoed text.
+message EchoUnaryResponse {
+  string message = 1;
+  google.protobuf.Timestamp echoed_at = 2;
+  acme.example.v2.SharedMetadata metadata = 3;
+}
+
+// EchoServerStreamRequest opens a server-streaming RPC.
+message EchoServerStreamRequest {
+  string message = 1;
+  uint32 chunk_count = 2;
+  google.protobuf.Duration inter_chunk_delay = 3;
+  acme.example.v2.SharedMetadata metadata = 4;
+}
+
+// EchoServerStreamResponse is one chunk in a server stream.
+message EchoServerStreamResponse {
+  string message = 1;
+  acme.example.v2.StreamCursor cursor = 2;
+  uint32 index = 3;
+}
+
+// EchoClientStreamRequest is one chunk in a client stream upload.
+message EchoClientStreamRequest {
+  string message = 1;
+  uint32 part_index = 2;
+  bool last_part = 3;
+}
+
+// EchoClientStreamResponse aggregates a client stream on the server.
+message EchoClientStreamResponse {
+  string joined_message = 1;
+  uint32 parts_received = 2;
+  google.protobuf.Timestamp completed_at = 3;
+}
+
+// EchoBidiStreamRequest is one frame in a bidirectional echo session.
+message EchoBidiStreamRequest {
+  string message = 1;
+  uint64 sequence = 2;
+  bool fin = 3;
+}
+
+// EchoBidiStreamResponse mirrors a bidirectional frame back to the client.
+message EchoBidiStreamResponse {
+  string message = 1;
+  uint64 sequence = 2;
+  bool fin = 3;
+  acme.example.v2.StreamCursor cursor = 4;
+}
+
+// WatchEchoRequest subscribes to echo events for a topic.
+message WatchEchoRequest {
+  string topic = 1;
+  acme.example.v2.TimeWindow window = 2;
+  repeated acme.example.v2.FilterExpression filters = 3;
+}
+
+// WatchEchoResponse is pushed on the WatchEcho server stream.
+message WatchEchoResponse {
+  string event_id = 1;
+  EchoUnaryResponse payload = 2;
+  google.protobuf.Timestamp observed_at = 3;
+}
+
+// BatchEchoRequest wraps a v2 batch payload for STANDARD RPC naming.
+message BatchEchoRequest {
+  acme.example.v2.BatchRequest batch = 1;
+}
+
+// BatchEchoResponse wraps a v2 batch result for STANDARD RPC naming.
+message BatchEchoResponse {
+  acme.example.v2.BatchResponse batch = 1;
+}
+
+// EchoService exposes echo RPCs for documentation tests.
+//
+// ```mermaid
+// sequenceDiagram
+//   participant C as Client
+//   participant E as EchoService
+//   C->>E: EchoUnary
+//   E-->>C: EchoUnaryResponse
+//   C->>E: EchoServerStream
+//   loop chunks
+//     E-->>C: EchoServerStreamResponse
+//   end
+//   C->>E: EchoBidiStream
+//   E-->>C: EchoBidiStreamResponse
+// ```
+service EchoService {
+  // EchoUnary is the hello-world RPC for this fixture.
+  //
+  // | Direction | Type |
+  // |-----------|------|
+  // | request | EchoUnaryRequest |
+  // | response | EchoUnaryResponse |
+  //
+  // hello-world RPC — leading comment preserved for mdBook heading link tests.
+  rpc EchoUnary(EchoUnaryRequest) returns (EchoUnaryResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // EchoServerStream demonstrates server streaming in generated docs.
+  rpc EchoServerStream(EchoServerStreamRequest) returns (stream EchoServerStreamResponse);
+
+  // EchoClientStream demonstrates client streaming uploads.
+  rpc EchoClientStream(stream EchoClientStreamRequest) returns (EchoClientStreamResponse);
+
+  // EchoBidiStream demonstrates bidirectional streaming.
+  rpc EchoBidiStream(stream EchoBidiStreamRequest) returns (stream EchoBidiStreamResponse);
+
+  // BatchEcho sends many envelopes in one unary call.
+  //
+  // Response type BatchEchoResponse is defined in this package; payload uses v2 batch types.
+  rpc BatchEcho(BatchEchoRequest) returns (BatchEchoResponse);
+
+  // WatchEcho pushes events for a subscription (server streaming).
+  rpc WatchEcho(WatchEchoRequest) returns (stream WatchEchoResponse);
+}
+
+// LegacyEchoNote is an ancillary message for cross-link examples.
+message LegacyEchoNote {
+  string note_id = 1;
+  string body = 2;
+  acme.example.v2.SeeAlsoBlock see_also = 3;
+}
+
+// EchoConfiguration captures static config referenced in comments only.
+message EchoConfiguration {
+  uint32 default_chunk_size = 1;
+  google.protobuf.Duration default_timeout = 2;
+  acme.example.v2.RetryPolicy retry_policy = 3;
+}
+
+// EchoConfigurationRequest fetches EchoConfiguration.
+message EchoConfigurationRequest {
+  acme.example.v2.TenantRef tenant = 1;
+}
+
+// EchoConfigurationResponse returns EchoConfiguration.
+message EchoConfigurationResponse {
+  EchoConfiguration config = 1;
+}
+
+// DocumentedEchoPair ties request/response for See Also blocks.
+message DocumentedEchoPair {
+  EchoUnaryRequest request = 1;
+  EchoUnaryResponse response = 2;
+}
+
+// EchoHistoryEntry is one row in a fictional audit trail.
+message EchoHistoryEntry {
+  google.protobuf.Timestamp at = 1;
+  string rpc_name = 2;
+  EchoUnaryRequest unary_request = 3;
+  acme.example.v2.ErrorDetail error = 4;
+}
+
+// ListEchoHistoryRequest lists EchoHistoryEntry rows.
+message ListEchoHistoryRequest {
+  acme.example.v2.ListOptions options = 1;
+  acme.example.v2.ResourceIdentity identity = 2;
+}
+
+// ListEchoHistoryResponse returns history rows.
+message ListEchoHistoryResponse {
+  repeated EchoHistoryEntry entries = 1;
+  acme.example.v2.PageResult page = 2;
+}

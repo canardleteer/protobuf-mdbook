@@ -1,0 +1,346 @@
+// acme.example.v2 — shared vocabulary for documentation generation fixtures.
+//
+// Lorem ipsum dolor sit amet, consectetur adipiscing elit. This package intentionally
+// accumulates **many** messages and enums so `protoc-gen-mdbook` can exercise package
+// rollup, cross-links from `acme.example.v1`, and long comment preservation.
+//
+// | Concern | Primary types |
+// |---------|----------------|
+// | Tracing | SharedMetadata, TraceContext |
+// | Auditing | AuditRecord, AuditBatch |
+// | Payloads | PayloadEnvelope, PayloadHeader |
+//
+// There is **no** Mermaid in this package; diagrams live in `acme.example.v1` only.
+syntax = "proto3";
+
+package acme.example.v2;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// SharedMetadata is referenced from v1 echo and gateway messages.
+//
+// Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque
+// laudantium. Keep `trace_id` opaque to callers; format is service-specific.
+message SharedMetadata {
+  // Distributed trace id (W3C `traceparent` or equivalent).
+  string trace_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Optional parent span for nested calls.
+  string parent_span_id = 2;
+  // When the trace context was minted.
+  google.protobuf.Timestamp created_at = 3;
+  // Arbitrary baggage for examples (not a production pattern).
+  map<string, string> baggage = 4;
+  // Classification for routing in docs.
+  SharedKind kind = 5;
+}
+
+// TraceContext duplicates some metadata for nested RPC examples.
+message TraceContext {
+  string trace_id = 1;
+  string span_id = 2;
+  google.protobuf.Duration sampling_delay = 3;
+}
+
+// SharedKind classifies metadata rows in examples.
+//
+// | Value | Meaning |
+// |-------|---------|
+// | UNSPECIFIED | default |
+// | ALPHA | first variant |
+// | BETA | second variant |
+// | GAMMA | third variant |
+enum SharedKind {
+  SHARED_KIND_UNSPECIFIED = 0;
+  SHARED_KIND_ALPHA = 1;
+  SHARED_KIND_BETA = 2;
+  SHARED_KIND_GAMMA = 3;
+}
+
+// Priority influences scheduler hints in narrative docs only.
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_NORMAL = 2;
+  PRIORITY_HIGH = 3;
+  PRIORITY_CRITICAL = 4;
+}
+
+// PayloadHeader precedes user bytes in envelope examples.
+message PayloadHeader {
+  string content_type = 1;
+  uint64 content_length = 2;
+  string checksum_sha256 = 3;
+  Priority priority = 4;
+}
+
+// PayloadEnvelope wraps opaque bytes with metadata.
+message PayloadEnvelope {
+  PayloadHeader header = 1;
+  bytes body = 2;
+  SharedMetadata metadata = 3;
+}
+
+// AuditRecord captures a single synthetic audit line.
+message AuditRecord {
+  string actor = 1;
+  string action = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+  google.protobuf.Struct details = 4;
+}
+
+// AuditBatch groups records for batch RPC demonstrations.
+message AuditBatch {
+  repeated AuditRecord records = 1;
+  string batch_id = 2;
+}
+
+// Location describes a fictional region for catalog cross-links.
+message Location {
+  string region_code = 1;
+  string display_name = 2;
+  double latitude = 3;
+  double longitude = 4;
+}
+
+// Address is a postal-style structure used in nested messages.
+message Address {
+  string line1 = 1;
+  string line2 = 2;
+  string city = 3;
+  string postal_code = 4;
+  Location region = 5;
+}
+
+// ContactInfo supports oneof-based documentation rendering.
+message ContactInfo {
+  oneof channel {
+    string email = 1;
+    string phone_e164 = 2;
+    string slack_user_id = 3;
+  }
+  string display_name = 4;
+}
+
+// TenantRef identifies a fictional tenant for multi-tenant stories.
+message TenantRef {
+  string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+  string slug = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64,
+    (buf.validate.field).string.pattern = "^[a-z0-9-]+$"
+  ];
+  SharedKind tier = 3;
+}
+
+// QuotaLimits documents soft limits referenced from gateway RPCs.
+message QuotaLimits {
+  uint32 max_requests_per_minute = 1;
+  uint32 max_stream_duration_seconds = 2;
+  uint64 max_payload_bytes = 3;
+}
+
+// ErrorDetail mirrors a simplified rich error shape for docs.
+message ErrorDetail {
+  string code = 1;
+  string message = 2;
+  map<string, string> metadata = 3;
+  repeated string help_links = 4;
+}
+
+// RetryPolicy is embedded in long-running operation messages.
+message RetryPolicy {
+  uint32 max_attempts = 1;
+  google.protobuf.Duration initial_backoff = 2;
+  google.protobuf.Duration max_backoff = 3;
+  double backoff_multiplier = 4;
+}
+
+// OperationStatus tracks synthetic long-running work.
+enum OperationStatus {
+  OPERATION_STATUS_UNSPECIFIED = 0;
+  OPERATION_STATUS_PENDING = 1;
+  OPERATION_STATUS_RUNNING = 2;
+  OPERATION_STATUS_SUCCEEDED = 3;
+  OPERATION_STATUS_FAILED = 4;
+  OPERATION_STATUS_CANCELLED = 5;
+}
+
+// LongRunningOperation is returned by admin-style RPCs in v1.
+message LongRunningOperation {
+  string name = 1;
+  OperationStatus status = 2;
+  google.protobuf.Timestamp start_time = 3;
+  google.protobuf.Timestamp end_time = 4;
+  RetryPolicy retry_policy = 5;
+  ErrorDetail error = 6;
+  double percent_complete = 7;
+}
+
+// Label is a key/value tag used across catalog and echo fixtures.
+message Label {
+  string key = 1;
+  string value = 2;
+}
+
+// LabelSet aggregates labels for resource descriptions.
+message LabelSet {
+  repeated Label labels = 1;
+}
+
+// ResourceIdentity combines tenant, labels, and metadata.
+message ResourceIdentity {
+  TenantRef tenant = 1;
+  LabelSet labels = 2;
+  SharedMetadata metadata = 3;
+  string resource_name = 4;
+}
+
+// NumericRange supports validation comment examples.
+message NumericRange {
+  int64 min_inclusive = 1;
+  int64 max_inclusive = 2;
+
+  option (buf.validate.message).cel = {
+    id: "numeric_range.min_lte_max"
+    message: "min_inclusive must not exceed max_inclusive"
+    expression: "this.min_inclusive <= this.max_inclusive"
+  };
+}
+
+// TimeWindow defines inclusive bounds for queries.
+message TimeWindow {
+  google.protobuf.Timestamp start = 1;
+  google.protobuf.Timestamp end = 2;
+}
+
+// FilterExpression is a intentionally verbose filter AST placeholder.
+message FilterExpression {
+  string field = 1;
+  string op = 2;
+  string value = 3;
+  repeated FilterExpression children = 4;
+}
+
+// PageToken supports pagination narrative in list RPCs.
+message PageToken {
+  string opaque = 1;
+  uint32 page_size = 2;
+}
+
+// PageResult completes a paginated list response.
+message PageResult {
+  PageToken next_page_token = 1;
+  uint32 total_size = 2;
+}
+
+// SortOrder documents ascending/descending list semantics.
+enum SortOrder {
+  SORT_ORDER_UNSPECIFIED = 0;
+  SORT_ORDER_ASC = 1;
+  SORT_ORDER_DESC = 2;
+}
+
+// SortKey pairs a field name with an order.
+message SortKey {
+  string field = 1;
+  SortOrder order = 2;
+}
+
+// ListOptions bundles pagination and sorting for list RPCs.
+message ListOptions {
+  PageToken page = 1;
+  repeated SortKey sort = 2;
+  repeated FilterExpression filters = 3;
+}
+
+// HealthStatus is reported by gateway health RPCs.
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTH_STATUS_SERVING = 1;
+  HEALTH_STATUS_NOT_SERVING = 2;
+  HEALTH_STATUS_DEGRADED = 3;
+}
+
+// ComponentHealth describes one sub-system in aggregate health.
+message ComponentHealth {
+  string component = 1;
+  HealthStatus status = 2;
+  string detail = 3;
+}
+
+// AggregateHealth rolls up component statuses.
+message AggregateHealth {
+  HealthStatus overall = 1;
+  repeated ComponentHealth components = 2;
+  google.protobuf.Timestamp evaluated_at = 3;
+}
+
+// StreamCursor supports resumable stream examples.
+message StreamCursor {
+  string stream_id = 1;
+  uint64 sequence = 2;
+  google.protobuf.Timestamp emitted_at = 3;
+}
+
+// StreamChunk is a unit payload in streaming RPC fixtures.
+message StreamChunk {
+  StreamCursor cursor = 1;
+  PayloadEnvelope payload = 2;
+  bool terminal = 3;
+}
+
+// BatchKey identifies an item inside batch requests.
+message BatchKey {
+  string id = 1;
+  string correlation_id = 2;
+}
+
+// BatchItem pairs a key with an envelope for batch APIs.
+message BatchItem {
+  BatchKey key = 1;
+  PayloadEnvelope envelope = 2;
+}
+
+// BatchRequest aggregates many items for BatchEcho RPCs.
+message BatchRequest {
+  repeated BatchItem items = 1 [(buf.validate.field).repeated.min_items = 1];
+  ResourceIdentity identity = 2;
+  bool partial_failure_allowed = 3;
+}
+
+// BatchItemResult reports per-item outcomes.
+message BatchItemResult {
+  BatchKey key = 1;
+  bool ok = 2;
+  ErrorDetail error = 3;
+  PayloadEnvelope response_envelope = 4;
+}
+
+// BatchResponse collects results for batch RPC documentation.
+message BatchResponse {
+  repeated BatchItemResult results = 1;
+  PageResult page = 2;
+}
+
+// EchoExtension carries optional hints from v2 into v1 echo flows.
+message EchoExtension {
+  string locale = 1;
+  repeated string keywords = 2;
+  map<string, string> annotations = 3;
+  NumericRange length_bounds = 4;
+}
+
+// DocumentationAnchor is a meta-message for cross-link stress tests.
+message DocumentationAnchor {
+  string title = 1;
+  string href = 2;
+  string summary = 3;
+}
+
+// SeeAlsoBlock groups anchors for See Also sections in comments.
+message SeeAlsoBlock {
+  repeated DocumentationAnchor anchors = 1;
+}

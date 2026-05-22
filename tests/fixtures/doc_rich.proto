@@ -1,0 +1,28 @@
+// Minimal rich-doc fixture aligned with examples/proto (subset).
+syntax = "proto3";
+
+package acme.example.v1;
+
+// EchoUnaryRequest carries the unary payload.
+message EchoUnaryRequest {
+  // inline field comment
+  string message = 1;
+}
+
+// EchoUnaryResponse returns the echoed text.
+message EchoUnaryResponse {
+  string message = 1;
+}
+
+// EchoService exposes echo RPCs.
+//
+// ```mermaid
+// sequenceDiagram
+//   C->>S: ping
+// ```
+service EchoService {
+  // EchoUnary RPC docs.
+  rpc EchoUnary(EchoUnaryRequest) returns (EchoUnaryResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}

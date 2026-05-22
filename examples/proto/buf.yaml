@@ -1,0 +1,10 @@
+version: v2
+# Protovalidate options (`buf.validate.*`) resolve from the Buf Schema Registry.
+deps:
+  - buf.build/bufbuild/protovalidate
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

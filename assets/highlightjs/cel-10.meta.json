@@ -1,0 +1,13 @@
+{
+  "grammar": "cel",
+  "hljs_version": "10.1.1",
+  "mdbook_pin": "0.5.3",
+  "vendored_file": "cel-10.js",
+  "vendored_sha256": "51e1ce9f22cccd4513bb03508675cd845dccff2510f0e30b0a6ee1ddc9528a9e",
+  "upstream_file_url": null,
+  "upstream_sha256": null,
+  "local_modifications": [
+    "authored for protoc-gen-mdbook; Protovalidate CEL surface",
+    "IIFE hljs.registerLanguage + registerAliases for mdBook theme load order"
+  ]
+}
