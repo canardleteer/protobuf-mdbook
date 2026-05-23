@@ -231,30 +231,11 @@ fn buf_command() -> Result<()> {
 /// Export `examples/proto` and its `buf.yaml` deps for protoc import paths.
 fn ensure_proto_deps_export() -> Result<PathBuf> {
     buf_command()?;
-    let proto_root = examples_proto();
-    let export_dir = proto_deps_export();
-    if export_dir.exists() {
-        std::fs::remove_dir_all(&export_dir).context("clear proto-deps export")?;
-    }
-    std::fs::create_dir_all(export_dir.parent().expect("target parent"))?;
-    let status = Command::new("buf")
-        .current_dir(&proto_root)
-        .args(["export", ".", "--output"])
-        .arg(&export_dir)
-        .status()
-        .context("buf export")?;
-    if !status.success() {
-        bail!("buf export failed");
-    }
-    let validate = export_dir.join("buf/validate/validate.proto");
-    if !validate.is_file() {
-        bail!(
-            "buf export missing {}; run `buf dep update` in {}",
-            validate.display(),
-            proto_root.display()
-        );
-    }
-    Ok(export_dir)
+    protoc_gen_mdbook::proto_deps::ensure_proto_deps_export(
+        &examples_proto(),
+        &proto_deps_export(),
+        true,
+    )
 }
 
 fn buf_lint() -> Result<()> {
