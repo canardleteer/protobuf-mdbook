@@ -1,0 +1,6 @@
+# Vendor grammars are content-addressed (see xtask check-highlightjs-vendor).
+assets/highlightjs/*.js text eol=lf
+assets/highlightjs/*.meta.json text eol=lf
+
+# Example protos and companions are checked with `buf format --diff` in CI.
+examples/proto/** text eol=lf

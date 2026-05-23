@@ -889,6 +889,7 @@ dependencies = [
  "protoc-bin-vendored",
  "protoc-gen-mdbook",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
 ]
 

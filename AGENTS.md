@@ -91,7 +91,7 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
   `buf.build/bufbuild/protovalidate` in `buf.yaml` / `buf.lock`).
 - Format locally: `cargo xtask fmt` (`cargo fmt` + `buf format -w`). CI uses `fmt-check`
   (`cargo fmt --check` + `buf format --diff`) and `buf lint` (Buf CLI on PATH; CI installs
-  1.69.0 via `buf-setup-action`). `xtask` / tests `buf export` to
+  1.69.0 via `cargo install buf-toolchain --locked --version 1.69.0`). `xtask` / tests `buf export` to
   `target/proto-deps/` for protoc `-I` only — never pass exported files as inputs.
 - Generated book at `./api-book/` (gitignored): CI runs `cargo xtask book-init --markdown-only` then `book-links`; local preview uses `book-init` once, then `book-refresh`.
 
@@ -221,7 +221,7 @@ Guided `book-*` xtasks target `./api-book`. `book-refresh` passes `book=` /
 - Local and GitHub Actions both run `cargo xtask ci` (see `.github/workflows/rust-tests.yml`).
 - Toolchain: `dsherret/rust-toolchain-file@v1` (reads `rust-toolchain.toml`); `ci` runs
   `check-toolchain --strict` before buf lint, fmt-check, and clippy/test.
-- Buf CLI 1.69.0: `buf-setup-action` on CI matrix; `ci` runs `buf-lint` and `fmt-check` (includes
+- Buf CLI 1.69.0: `cargo install buf-toolchain --locked --version 1.69.0` on CI; `ci` runs `buf-lint` and `fmt-check` (includes
   `buf format --diff` on `examples/proto/`).
 - Matrix covers Linux, macOS, and Windows with `shell: bash`.
 - **Docker:** `cargo xtask docker` builds the scratch image (`Dockerfile`) and runs

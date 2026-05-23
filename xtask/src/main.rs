@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -192,7 +193,14 @@ fn build_plugin() -> Result<()> {
 }
 
 fn plugin_path() -> Result<PathBuf> {
-    Ok(Path::new(WORKSPACE_ROOT).join("target/release/protoc-gen-mdbook"))
+    let mut path = Path::new(WORKSPACE_ROOT).join("target/release/protoc-gen-mdbook");
+    if cfg!(windows) {
+        path.set_extension("exe");
+    }
+    let path = path
+        .canonicalize()
+        .with_context(|| format!("locate plugin binary at {}", path.display()))?;
+    Ok(path)
 }
 
 fn examples_proto() -> PathBuf {
@@ -213,7 +221,9 @@ fn buf_command() -> Result<()> {
         Ok(())
     } else {
         bail!(
-            "buf CLI not found or failed; install Buf 1.69.0 (see Dockerfile buf-anchor or https://buf.build/docs/cli/installation/)"
+            "buf CLI not found or failed; install with \
+             `cargo install buf-toolchain --locked --version 1.69.0` \
+             (see Dockerfile buf-anchor)"
         );
     }
 }
@@ -559,27 +569,12 @@ fn docker_smoke_config() -> Result<()> {
 }
 
 fn sha256_hex(path: &Path) -> Result<String> {
-    let output = Command::new("sha256sum")
-        .arg(path)
-        .output()
-        .with_context(|| format!("sha256sum {}", path.display()))?;
-    if !output.status.success() {
-        bail!(
-            "sha256sum failed for {}: {}",
-            path.display(),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    let line = String::from_utf8(output.stdout)?;
-    let hash = line.split_whitespace().next().context("sha256sum output")?;
-    Ok(hash.to_string())
+    let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+    Ok(sha256_hex_bytes(&bytes))
 }
 
-fn sha256_hex_bytes(bytes: &[u8]) -> Result<String> {
-    let dir = tempfile::tempdir().context("tempdir for sha256")?;
-    let path = dir.path().join("blob");
-    std::fs::write(&path, bytes)?;
-    sha256_hex(&path)
+fn sha256_hex_bytes(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
 }
 
 /// Compare vendored Highlight.js grammars against `assets/highlightjs/*.meta.json`.
@@ -673,7 +668,7 @@ fn check_highlightjs_vendor() -> Result<()> {
                         String::from_utf8_lossy(&output.stderr)
                     );
                 }
-                let upstream_sha = sha256_hex_bytes(&output.stdout)?;
+                let upstream_sha = sha256_hex_bytes(&output.stdout);
                 if upstream_sha != expected {
                     bail!(
                         "upstream_sha256 drift for {grammar}: fetched={upstream_sha}, \
