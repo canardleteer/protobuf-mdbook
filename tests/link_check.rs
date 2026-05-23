@@ -3,32 +3,11 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-fn proto_deps_export(manifest_dir: &Path) -> PathBuf {
-    manifest_dir.join("target/proto-deps")
-}
-
 fn ensure_proto_deps_export(manifest_dir: &Path) -> PathBuf {
     let proto_dir = manifest_dir.join("examples/proto");
-    let export_dir = proto_deps_export(manifest_dir);
-    if export_dir.join("buf/validate/validate.proto").is_file() {
-        return export_dir;
-    }
-    if export_dir.exists() {
-        std::fs::remove_dir_all(&export_dir).expect("clear proto-deps export");
-    }
-    std::fs::create_dir_all(export_dir.parent().expect("target parent")).expect("create target");
-    let status = std::process::Command::new("buf")
-        .current_dir(&proto_dir)
-        .args(["export", ".", "--output"])
-        .arg(&export_dir)
-        .status()
-        .expect("spawn buf export");
-    assert!(status.success(), "buf export examples/proto");
-    assert!(
-        export_dir.join("buf/validate/validate.proto").is_file(),
-        "buf export must include protovalidate"
-    );
-    export_dir
+    let export_dir = manifest_dir.join("target/proto-deps");
+    protoc_gen_mdbook::proto_deps::ensure_proto_deps_export(&proto_dir, &export_dir, false)
+        .expect("ensure proto deps export")
 }
 
 fn run_protoc_in(out: &Path, layout: &str, extra_opt: &str) {

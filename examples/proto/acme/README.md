@@ -1,6 +1,7 @@
 # Acme APIs
 
-Overview of the Acme example protobuf modules used by `protoc-gen-mdbook`
+Overview of the Acme example protobuf modules used by the
+[`protoc-gen-mdbook`](https://github.com/canardleteer/protoc-gen-mdbook/)
 fixtures.
 
 ## Example output from protoc-gen-mdbook

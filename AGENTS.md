@@ -88,11 +88,14 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
 ## Examples and output
 
 - Authoritative example protos: `examples/proto/` (Buf module; BSR dep
-  `buf.build/bufbuild/protovalidate` in `buf.yaml` / `buf.lock`).
+  `buf.build/bufbuild/protovalidate` in `buf.yaml` / `buf.lock` — **never vendored**
+  in-repo). `buf lint` / `buf format` resolve deps via Buf; protoc runs export on demand.
 - Format locally: `cargo xtask fmt` (`cargo fmt` + `buf format -w`). CI uses `fmt-check`
   (`cargo fmt --check` + `buf format --diff`) and `buf lint` (Buf CLI on PATH; CI installs
-  1.69.0 via `cargo install buf-toolchain --locked --version 1.69.0`). `xtask` / tests `buf export` to
-  `target/proto-deps/` for protoc `-I` only — never pass exported files as inputs.
+  1.69.0 via `cargo install buf-toolchain --locked --version 1.69.0`). Shared helper
+  `proto_deps::ensure_proto_deps_export` writes gitignored `target/proto-deps/` for protoc
+  `-I` only — never pass exported files as inputs (`cargo xtask book-*` and link-check tests
+  call it automatically).
 - Generated book at `./api-book/` (gitignored): CI runs `cargo xtask book-init --markdown-only` then `book-links`; local preview uses `book-init` once, then `book-refresh`.
 
 ## Output conventions

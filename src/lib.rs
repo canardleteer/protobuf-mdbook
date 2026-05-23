@@ -8,6 +8,7 @@ pub mod book_config;
 pub mod init;
 pub mod link_check;
 pub mod options;
+pub mod proto_deps;
 pub mod proto_markdown;
 pub mod render;
 pub mod summary;
