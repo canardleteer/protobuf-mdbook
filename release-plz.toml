@@ -1,0 +1,7 @@
+[workspace]
+repo_url = "https://github.com/canardleteer/protobuf-mdbook"
+pr_labels = ["release"]
+
+[[package]]
+name = "protobuf-mdbook-xtask"
+release = false

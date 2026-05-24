@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "protobuf-mdbook"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "anyhow",
  "buffa",
@@ -819,7 +819,7 @@ dependencies = [
 
 [[package]]
 name = "protobuf-mdbook-xtask"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "anyhow",
  "clap",
