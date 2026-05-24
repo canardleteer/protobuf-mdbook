@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-rc.2](https://github.com/canardleteer/protobuf-mdbook/compare/v0.1.0-rc.1...v0.1.0-rc.2) - 2026-05-24
+
+### Added
+
+- *(protobuf-mdbook)* normalize options for non-protoc usage
+- escape in proto documentation html tags
+
+### Other
+
+- second pass of simplification
+- code simplification and reduction pass
+- release v0.1.0-rc.1
+
 ## [0.1.0-rc.1](https://github.com/canardleteer/protobuf-mdbook/releases/tag/v0.1.0-rc.1) - 2026-05-24
 
 ### Added
