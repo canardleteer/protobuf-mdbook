@@ -4,6 +4,7 @@ use crate::options::Options;
 use crate::plugin_api::FileDescriptorProto;
 use crate::render::comments::{CommentIndex, package_overview};
 use crate::render::links::LinkContext;
+use crate::render::markdown_doc::format_markdown_doc;
 use crate::render::proto_syntax::{
     RenderContext, synthesize_enum, synthesize_message_with_file, synthesize_service,
 };
@@ -26,13 +27,14 @@ pub fn render_package_page(
     let ctx = RenderContext {
         links: Some(links),
         from_md: rel.as_path(),
+        escape_tags: opts.escape_tags,
     };
 
     let mut out = String::new();
     out.push_str(&md_heading(1, package));
 
     if let Some(overview) = package_overview(files) {
-        out.push_str(&overview);
+        out.push_str(&format_markdown_doc(&overview, opts.escape_tags));
         push_paragraph_break(&mut out);
     }
 
@@ -80,12 +82,13 @@ pub fn render_package_page(
                     i,
                     msg,
                     Some(source),
+                    Some(&ctx),
                 ));
             }
             for (i, en) in file.enum_type.iter().enumerate() {
                 let name = en.name.as_deref().unwrap_or("Enum");
                 out.push_str(&md_heading(ENTITY_LEVEL, name));
-                out.push_str(&synthesize_enum(fname, &idx, i, en));
+                out.push_str(&synthesize_enum(fname, &idx, i, en, Some(&ctx)));
             }
         }
     }

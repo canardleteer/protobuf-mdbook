@@ -119,6 +119,10 @@ fn run_cli_examples_in(out: &Path, layout: &str, extra_opt: &str) {
 }
 
 pub fn run_fixture_protoc(out: &Path, extra_opt: &str) {
+    run_fixture_protoc_proto(out, "doc_rich.proto", extra_opt);
+}
+
+pub fn run_fixture_protoc_proto(out: &Path, proto_file: &str, extra_opt: &str) {
     let protoc = protoc_bin_vendored::protoc_bin_path().expect("vendored protoc");
     let plugin: PathBuf = env!("CARGO_BIN_EXE_protoc-gen-mdbook").into();
     let fixture_dir = fixtures_dir();
@@ -135,13 +139,20 @@ pub fn run_fixture_protoc(out: &Path, extra_opt: &str) {
     if !extra_opt.is_empty() {
         cmd.arg(format!("--mdbook_opt={extra_opt}"));
     }
-    cmd.arg("doc_rich.proto");
+    cmd.arg(proto_file);
 
     let status = cmd.status().expect("spawn protoc");
-    assert!(status.success(), "protoc fixture opt={extra_opt}");
+    assert!(
+        status.success(),
+        "protoc fixture proto={proto_file} opt={extra_opt}"
+    );
 }
 
 pub fn run_fixture_cli(out: &Path, extra_opt: &str) {
+    run_fixture_cli_proto(out, "doc_rich.proto", extra_opt);
+}
+
+pub fn run_fixture_cli_proto(out: &Path, proto_file: &str, extra_opt: &str) {
     let cli: PathBuf = env!("CARGO_BIN_EXE_protobuf-mdbook").into();
     let fixture_dir = fixtures_dir();
 
@@ -150,19 +161,26 @@ pub fn run_fixture_cli(out: &Path, extra_opt: &str) {
         .arg(out)
         .args(["--compiler", "protoc", "-I"])
         .arg(&fixture_dir)
-        .arg("doc_rich.proto")
+        .arg(proto_file)
         .current_dir(&fixture_dir);
     if !extra_opt.is_empty() {
         cmd.args(["--opt", extra_opt]);
     }
     let status = cmd.status().expect("spawn protobuf-mdbook");
-    assert!(status.success(), "protobuf-mdbook fixture opt={extra_opt}");
+    assert!(
+        status.success(),
+        "protobuf-mdbook fixture proto={proto_file} opt={extra_opt}"
+    );
 }
 
 pub fn run_fixture_in(out: &Path, extra_opt: &str, backend: Backend) {
+    run_fixture_proto_in(out, "doc_rich.proto", extra_opt, backend);
+}
+
+pub fn run_fixture_proto_in(out: &Path, proto_file: &str, extra_opt: &str, backend: Backend) {
     match backend {
-        Backend::ProtocPlugin => run_fixture_protoc(out, extra_opt),
-        Backend::ProtobufMdbook => run_fixture_cli(out, extra_opt),
+        Backend::ProtocPlugin => run_fixture_protoc_proto(out, proto_file, extra_opt),
+        Backend::ProtobufMdbook => run_fixture_cli_proto(out, proto_file, extra_opt),
     }
 }
 

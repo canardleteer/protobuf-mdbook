@@ -10,6 +10,15 @@ pub enum Layout {
     Split,
 }
 
+/// How to rewrite HTML-like `<tag>` tokens in leading-comment prose for mdBook.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum EscapeTags {
+    #[default]
+    Off,
+    Backticks,
+    Entities,
+}
+
 #[derive(Clone, Debug)]
 pub struct Options {
     pub init: bool,
@@ -34,6 +43,8 @@ pub struct Options {
     pub layout: Layout,
     /// Extra directories to resolve `FileDescriptorProto.name` when reading source for spans.
     pub proto_search_path: Vec<PathBuf>,
+    /// Rewrite HTML-like angle-bracket tokens in leading-comment prose.
+    pub escape_tags: EscapeTags,
 }
 
 impl Default for Options {
@@ -56,6 +67,7 @@ impl Default for Options {
             ignore_git: true,
             layout: Layout::Package,
             proto_search_path: Vec::new(),
+            escape_tags: EscapeTags::Off,
         }
     }
 }
@@ -164,6 +176,18 @@ fn apply_option_token(opts: &mut Options, token: &str, saw_markdown_only: &mut b
             "entity" => Layout::Entity,
             "split" => Layout::Split,
             other => bail!("unknown layout {other:?}; use package, entity, or split"),
+        };
+        return Ok(());
+    }
+    if token == "escape_tags" {
+        opts.escape_tags = EscapeTags::Backticks;
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("escape_tags=") {
+        opts.escape_tags = match v {
+            "backticks" => EscapeTags::Backticks,
+            "entities" => EscapeTags::Entities,
+            other => bail!("unknown escape_tags value {other:?}; use backticks or entities"),
         };
         return Ok(());
     }
@@ -340,5 +364,31 @@ mod tests {
         let o = parse_parameter(&Some("book=./api-book,mdbook_out=./api-book".into())).unwrap();
         assert_eq!(o.book.as_deref(), Some("./api-book"));
         assert_eq!(o.mdbook_out.as_deref(), Some("./api-book"));
+    }
+
+    #[test]
+    fn escape_tags_defaults_off() {
+        let o = parse_parameter(&None).unwrap();
+        assert_eq!(o.escape_tags, EscapeTags::Off);
+    }
+
+    #[test]
+    fn parses_escape_tags_bare_flag() {
+        let o = parse_parameter(&Some("escape_tags".into())).unwrap();
+        assert_eq!(o.escape_tags, EscapeTags::Backticks);
+    }
+
+    #[test]
+    fn parses_escape_tags_backticks_and_entities() {
+        let backticks = parse_parameter(&Some("escape_tags=backticks".into())).unwrap();
+        assert_eq!(backticks.escape_tags, EscapeTags::Backticks);
+        let entities = parse_parameter(&Some("escape_tags=entities".into())).unwrap();
+        assert_eq!(entities.escape_tags, EscapeTags::Entities);
+    }
+
+    #[test]
+    fn unknown_escape_tags_value_errors() {
+        let err = parse_parameter(&Some("escape_tags=foo".into())).unwrap_err();
+        assert!(format!("{err:#}").contains("escape_tags"));
     }
 }

@@ -167,8 +167,10 @@ Prefer **synthesized `protobuf` fences** (with source file path), not field/enum
 
 ### Generated output (plugin)
 
-- Proto comments come from `SourceCodeInfo` and are emitted **verbatim** (see `push_markdown_doc` in
-  `src/render/proto_syntax.rs`) — no reflow, no injected hard line breaks inside emphasis or links.
+- Proto comments come from `SourceCodeInfo` and are emitted **verbatim** by default (see
+  `push_markdown_doc` in `src/render/proto_syntax.rs`) — no reflow, no injected hard line breaks
+  inside emphasis or links. Optional `escape_tags` rewrites HTML-like `<…>` in leading-comment
+  prose for mdBook; see the README generator options table.
 - RPC signature lines are generated as single-line Markdown, e.g.
   `**EchoUnary** ( [EchoUnaryRequest](#…) ) returns ( … )` — keep type links on one line; do not
   split `[text](#anchor)` or `*…*` / `**…**` across lines when changing render code.
@@ -215,6 +217,8 @@ runs `protobuf-mdbook` instead. `book-refresh` passes `book=` /
   uses default buf on `examples/proto`; skipped when `buf` is not on PATH).
 - Shared helpers: [`tests/common/mod.rs`](tests/common/mod.rs) (`mirrored_backends`,
   `mirrored_fixture_backends`, `run_examples`, `run_fixture`).
+- Golden output regression: `tests/output_regression.rs`; refresh baselines with
+  `cargo xtask update-golden`.
 - Required gate: `cargo xtask book-links` (part of `ci`, after `book-init --markdown-only`).
 - When iterating on markdown output: `cargo xtask book-init --markdown-only`, `cargo xtask book-links`.
 - Local coverage: `cargo xtask coverage --open` (requires `cargo install cargo-llvm-cov --locked`

@@ -29,6 +29,8 @@ enum Cmd {
     FmtCheck,
     Clippy,
     Test,
+    /// Refresh checked-in golden fixtures under `tests/fixtures/golden/`.
+    UpdateGolden,
     BuildPlugin,
     /// Scaffold or regenerate `./api-book` from `examples/proto/`.
     BookInit {
@@ -94,6 +96,7 @@ fn main() -> Result<()> {
         Cmd::FmtCheck => ci::fmt_check(),
         Cmd::Clippy => ci::clippy(),
         Cmd::Test => ci::test(),
+        Cmd::UpdateGolden => ci::update_golden(),
         Cmd::BuildPlugin => ci::build_plugin(),
         Cmd::BookInit {
             layout,
