@@ -1,0 +1,37 @@
+# Install buf / mdbook / mdbook-mermaid CLIs pinned by toolchain-versions.
+name: Install toolchain CLI
+description: cargo install toolchain binaries using BUF_VERSION, MDBOOK_VERSION, and MDBOOK_MERMAID_VERSION from GITHUB_ENV
+
+inputs:
+  mdbook:
+    description: Install mdbook CLI
+    required: false
+    default: "false"
+  mdbook-mermaid:
+    description: Install mdbook-mermaid preprocessor
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Install pinned toolchain CLIs
+      shell: bash
+      run: |
+        set -euo pipefail
+        : "${BUF_VERSION:?BUF_VERSION not set; run ./.github/actions/toolchain-versions first}"
+        if ! command -v buf >/dev/null 2>&1; then
+          cargo install buf-toolchain --locked --version "$BUF_VERSION" --force
+        fi
+        if [[ "${{ inputs.mdbook }}" == "true" ]]; then
+          : "${MDBOOK_VERSION:?MDBOOK_VERSION not set; run ./.github/actions/toolchain-versions first}"
+          if ! command -v mdbook >/dev/null 2>&1; then
+            cargo install mdbook --version "$MDBOOK_VERSION" --locked --force
+          fi
+        fi
+        if [[ "${{ inputs.mdbook-mermaid }}" == "true" ]]; then
+          : "${MDBOOK_MERMAID_VERSION:?MDBOOK_MERMAID_VERSION not set; run ./.github/actions/toolchain-versions first}"
+          if ! command -v mdbook-mermaid >/dev/null 2>&1; then
+            cargo install mdbook-mermaid --locked --version "$MDBOOK_MERMAID_VERSION" --force
+          fi
+        fi

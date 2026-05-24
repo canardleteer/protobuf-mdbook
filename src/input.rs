@@ -9,7 +9,7 @@ use buffa_descriptor::generated::descriptor::FileDescriptorSet;
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use walkdir::WalkDir;
 
 const BUF_INSTALL_HINT: &str = "cargo install buf-toolchain --locked --version 1.69.0";
@@ -537,14 +537,19 @@ pub fn resolve_protoc_path(explicit: Option<&Path>) -> Result<PathBuf> {
     })
 }
 
+/// Probe for a CLI tool without printing its `--version` / `version` banner.
 fn tool_exists(name: &str) -> bool {
     Command::new(name)
         .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .ok()
         .is_some_and(|s| s.success())
         || Command::new(name)
             .arg("version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
             .ok()
             .is_some_and(|s| s.success())

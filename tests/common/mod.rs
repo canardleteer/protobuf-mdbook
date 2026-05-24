@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 pub const EXAMPLE_PROTO_INPUTS: &[&str] = &[
     "acme/example/v1/echo.proto",
@@ -34,9 +34,12 @@ pub fn fixtures_dir() -> PathBuf {
     manifest_dir().join("tests/fixtures")
 }
 
+/// Whether `buf` is on PATH (stdout/stderr discarded so parallel tests stay quiet).
 pub fn buf_available() -> bool {
     Command::new("buf")
         .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .ok()
         .is_some_and(|s| s.success())
