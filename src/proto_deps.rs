@@ -51,3 +51,23 @@ pub fn ensure_proto_deps_export(
     }
     Ok(export_dir.to_path_buf())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn ensure_proto_deps_export_reuses_existing_validate_proto() {
+        let export_dir = tempfile::tempdir().expect("tempdir");
+        let validate = validate_proto_path(export_dir.path());
+        fs::create_dir_all(validate.parent().expect("parent")).expect("mkdir");
+        fs::write(&validate, "// stub\n").expect("write validate.proto");
+
+        let got = ensure_proto_deps_export(Path::new("/unused"), export_dir.path(), false)
+            .expect("cache hit");
+        assert_eq!(got, export_dir.path());
+        assert!(validate.is_file());
+        assert_eq!(fs::read_to_string(&validate).expect("read"), "// stub\n");
+    }
+}

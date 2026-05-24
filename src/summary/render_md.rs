@@ -64,7 +64,7 @@ fn push_link(out: &mut String, link: &Link, depth: usize) {
 /// Warn on stderr if mdBook cannot parse the rendered SUMMARY (still returns `text`).
 pub fn validate_summary_warn(text: &str) {
     if let Err(e) = mdbook_summary::parse_summary(text) {
-        eprintln!("protoc-gen-mdbook: warning: generated SUMMARY.md failed parse_summary: {e}");
+        eprintln!("protobuf-mdbook: warning: generated SUMMARY.md failed parse_summary: {e}");
     }
 }
 

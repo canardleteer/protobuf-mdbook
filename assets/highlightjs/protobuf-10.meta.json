@@ -5,7 +5,7 @@
   "hljs_version": "10.1.1",
   "mdbook_pin": "0.5.3",
   "vendored_file": "protobuf-10.js",
-  "vendored_sha256": "54185cef5a2ccb4b57ffb498fd37b44a9becf3285fbb62fdec192e67652a76be",
+  "vendored_sha256": "43ea40175c3b92f0dac12fb0edafa2c0541c7b10c1a679e79a07704f9b91cafa",
   "local_modifications": [
     "IIFE hljs.registerLanguage + registerAliases for mdBook theme load order",
     "keywords: syntax, edition, extend, reserved, map, weak, public"

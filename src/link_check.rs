@@ -136,3 +136,40 @@ fn extract_links(content: &str) -> Vec<(String, usize)> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_tree_missing_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("page.md"), "[broken](missing.md)\n").expect("write");
+        let errors = check_tree(dir.path()).expect("check");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].message.contains("file not found"));
+    }
+
+    #[test]
+    fn check_tree_bad_anchor() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("page.md"),
+            "# Real heading\n\n[link](page.md#no-such-heading)\n",
+        )
+        .expect("write");
+        let errors = check_tree(dir.path()).expect("check");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].message.contains("broken anchor"));
+    }
+
+    #[test]
+    fn assert_tree_surfaces_errors() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("page.md"), "[broken](missing.md)\n").expect("write");
+        let err = assert_tree(dir.path()).expect_err("should fail");
+        let msg = err.to_string();
+        assert!(msg.contains("markdown link check failed"));
+        assert!(msg.contains("missing.md"));
+    }
+}

@@ -1,7 +1,7 @@
-//! Crate-local CI and example generation for `protoc-gen-mdbook`.
+//! Crate-local CI and example generation for `protobuf-mdbook`.
 
 use anyhow::{Context, Result, bail};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -9,8 +9,18 @@ use std::process::Command;
 const CRATE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
 const WORKSPACE_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
 
-/// Repo-local mdBook output (`--mdbook_out`). Guided `book-*` tasks always target this tree.
+/// Repo-local mdBook output (`--mdbook_out` / `-o`). Guided `book-*` tasks target this tree.
 const API_BOOK_DIR: &str = "api-book";
+
+/// Which binary drives guided `book-*` generation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum GeneratorArg {
+    /// `protoc` + `protoc-gen-mdbook` plugin (default; matches CI).
+    #[default]
+    Protoc,
+    /// `protobuf-mdbook` CLI (default buf compiler on `examples/proto/`).
+    Cli,
+}
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -40,6 +50,9 @@ enum Cmd {
         /// Markdown only (no mdBook scaffold); wipes `./api-book` first. CI uses this.
         #[arg(long)]
         markdown_only: bool,
+        /// `protoc` plugin (default) or `protobuf-mdbook` CLI.
+        #[arg(long, value_enum, default_value_t = GeneratorArg::Protoc)]
+        generator: GeneratorArg,
     },
     /// Refresh `./api-book` package markdown without `init` (preserves book.toml, theme, README).
     /// Passes `book=` so paths are loaded from `book.toml` via mdbook-core.
@@ -48,6 +61,9 @@ enum Cmd {
         layout: String,
         #[arg(long)]
         summary: bool,
+        /// `protoc` plugin (default) or `protobuf-mdbook` CLI.
+        #[arg(long, value_enum, default_value_t = GeneratorArg::Protoc)]
+        generator: GeneratorArg,
     },
     /// Resolve in-page links and mdBook heading anchors in `./api-book/`.
     BookLinks,
@@ -95,7 +111,9 @@ fn main() -> Result<()> {
             run("test", test)?;
             run("build-plugin", build_plugin)?;
             run("check-highlightjs-vendor", check_highlightjs_vendor)?;
-            run("book-init", || book_init("package", false, true))?;
+            run("book-init", || {
+                book_init("package", false, true, GeneratorArg::Protoc)
+            })?;
             run("book-links", book_links)?;
             Ok(())
         }
@@ -108,8 +126,13 @@ fn main() -> Result<()> {
             layout,
             summary,
             markdown_only,
-        } => book_init(&layout, summary, markdown_only),
-        Cmd::BookRefresh { layout, summary } => book_refresh(&layout, summary),
+            generator,
+        } => book_init(&layout, summary, markdown_only, generator),
+        Cmd::BookRefresh {
+            layout,
+            summary,
+            generator,
+        } => book_refresh(&layout, summary, generator),
         Cmd::BookLinks => book_links(),
         Cmd::BookBuild => book_build(),
         Cmd::RumdlCheck => rumdl_check(),
@@ -160,9 +183,9 @@ fn cargo_fmt(extra: &[&str]) -> Result<()> {
     let mut args = vec![
         "fmt",
         "-p",
-        "protoc-gen-mdbook",
+        "protobuf-mdbook",
         "-p",
-        "protoc-gen-mdbook-xtask",
+        "protobuf-mdbook-xtask",
         "--",
     ];
     args.extend_from_slice(extra);
@@ -174,9 +197,9 @@ fn clippy() -> Result<()> {
         "clippy",
         "--locked",
         "-p",
-        "protoc-gen-mdbook",
+        "protobuf-mdbook",
         "-p",
-        "protoc-gen-mdbook-xtask",
+        "protobuf-mdbook-xtask",
         "--all-targets",
         "--",
         "-D",
@@ -185,22 +208,28 @@ fn clippy() -> Result<()> {
 }
 
 fn test() -> Result<()> {
-    cargo(&["test", "--locked", "-p", "protoc-gen-mdbook"])
+    cargo(&["test", "--locked", "-p", "protobuf-mdbook"])
 }
 
 fn build_plugin() -> Result<()> {
-    cargo(&["build", "--locked", "--release", "-p", "protoc-gen-mdbook"])
+    cargo(&["build", "--locked", "--release", "-p", "protobuf-mdbook"])
 }
 
-fn plugin_path() -> Result<PathBuf> {
-    let mut path = Path::new(WORKSPACE_ROOT).join("target/release/protoc-gen-mdbook");
+fn release_bin(name: &str) -> Result<PathBuf> {
+    let mut path = Path::new(WORKSPACE_ROOT).join(format!("target/release/{name}"));
     if cfg!(windows) {
         path.set_extension("exe");
     }
-    let path = path
-        .canonicalize()
-        .with_context(|| format!("locate plugin binary at {}", path.display()))?;
-    Ok(path)
+    path.canonicalize()
+        .with_context(|| format!("locate binary at {}", path.display()))
+}
+
+fn plugin_path() -> Result<PathBuf> {
+    release_bin("protoc-gen-mdbook")
+}
+
+fn cli_path() -> Result<PathBuf> {
+    release_bin("protobuf-mdbook")
 }
 
 fn examples_proto() -> PathBuf {
@@ -231,7 +260,7 @@ fn buf_command() -> Result<()> {
 /// Export `examples/proto` and its `buf.yaml` deps for protoc import paths.
 fn ensure_proto_deps_export() -> Result<PathBuf> {
     buf_command()?;
-    protoc_gen_mdbook::proto_deps::ensure_proto_deps_export(
+    protobuf_mdbook::proto_deps::ensure_proto_deps_export(
         &examples_proto(),
         &proto_deps_export(),
         true,
@@ -335,25 +364,30 @@ fn collect_example_protos_rec(
     Ok(())
 }
 
-fn run_protoc_on_examples(out_dir: &Path, mdbook_opt: &str) -> Result<()> {
-    build_plugin()?;
-    let protoc = protoc_bin()?;
-    let plugin = plugin_path()?;
+fn prepare_example_output(out_dir: &Path, mdbook_opt: &str) -> Result<Vec<PathBuf>> {
     let proto_root = examples_proto();
     let inputs = collect_example_protos(&proto_root)?;
     if inputs.is_empty() {
         bail!("no .proto files under {}", proto_root.display());
     }
+    if out_dir.exists() && mdbook_opt.contains("init") {
+        std::fs::remove_dir_all(out_dir).context("clear output before init")?;
+    }
+    std::fs::create_dir_all(out_dir)?;
+    Ok(inputs)
+}
+
+fn run_protoc_on_examples(out_dir: &Path, mdbook_opt: &str) -> Result<()> {
+    build_plugin()?;
+    let protoc = protoc_bin()?;
+    let plugin = plugin_path()?;
+    let proto_root = examples_proto();
+    let inputs = prepare_example_output(out_dir, mdbook_opt)?;
     eprintln!(
         "xtask: protoc {} proto file(s) → {} (opt={mdbook_opt})",
         inputs.len(),
         out_dir.display()
     );
-
-    if out_dir.exists() && mdbook_opt.contains("init") {
-        std::fs::remove_dir_all(out_dir).context("clear output before init")?;
-    }
-    std::fs::create_dir_all(out_dir)?;
 
     let deps = ensure_proto_deps_export()?;
     let mut cmd = Command::new(protoc);
@@ -375,16 +409,58 @@ fn run_protoc_on_examples(out_dir: &Path, mdbook_opt: &str) -> Result<()> {
     Ok(())
 }
 
-fn book_init(layout: &str, summary: bool, markdown_only: bool) -> Result<()> {
+fn run_cli_on_examples(out_dir: &Path, mdbook_opt: &str) -> Result<()> {
+    build_plugin()?;
+    buf_command()?;
+    let cli = cli_path()?;
+    let proto_root = examples_proto();
+    let inputs = prepare_example_output(out_dir, mdbook_opt)?;
+    eprintln!(
+        "xtask: protobuf-mdbook {} proto file(s) → {} (opt={mdbook_opt})",
+        inputs.len(),
+        out_dir.display()
+    );
+
+    let mut cmd = Command::new(cli);
+    cmd.current_dir(&proto_root)
+        .arg("-o")
+        .arg(out_dir)
+        .arg("--opt")
+        .arg(mdbook_opt)
+        .arg("--opt")
+        .arg("proto_path=.");
+    for rel in &inputs {
+        cmd.arg(rel);
+    }
+    let status = cmd.status().context("protobuf-mdbook")?;
+    if !status.success() {
+        bail!("protobuf-mdbook failed");
+    }
+    Ok(())
+}
+
+fn run_on_examples(out_dir: &Path, mdbook_opt: &str, generator: GeneratorArg) -> Result<()> {
+    match generator {
+        GeneratorArg::Protoc => run_protoc_on_examples(out_dir, mdbook_opt),
+        GeneratorArg::Cli => run_cli_on_examples(out_dir, mdbook_opt),
+    }
+}
+
+fn book_init(
+    layout: &str,
+    summary: bool,
+    markdown_only: bool,
+    generator: GeneratorArg,
+) -> Result<()> {
     let out = api_book();
     if markdown_only && out.exists() {
         std::fs::remove_dir_all(&out).context("clear api-book before markdown-only init")?;
     }
     let init = !markdown_only;
-    run_protoc_on_examples(&out, &mdbook_opt(layout, summary, init, false))
+    run_on_examples(&out, &mdbook_opt(layout, summary, init, false), generator)
 }
 
-fn book_refresh(layout: &str, summary: bool) -> Result<()> {
+fn book_refresh(layout: &str, summary: bool, generator: GeneratorArg) -> Result<()> {
     let out = api_book();
     if !out.join("book.toml").is_file() {
         bail!(
@@ -392,7 +468,7 @@ fn book_refresh(layout: &str, summary: bool) -> Result<()> {
             out.display()
         );
     }
-    run_protoc_on_examples(&out, &mdbook_opt(layout, summary, false, true))
+    run_on_examples(&out, &mdbook_opt(layout, summary, false, true), generator)
 }
 
 fn protoc_bin() -> Result<PathBuf> {
@@ -402,7 +478,7 @@ fn protoc_bin() -> Result<PathBuf> {
 fn book_links() -> Result<()> {
     let out_dir = api_book();
     let markdown_root = if out_dir.join("book.toml").is_file() {
-        protoc_gen_mdbook::book_config::markdown_root_dir(&out_dir)
+        protobuf_mdbook::book_config::markdown_root_dir(&out_dir)
             .with_context(|| format!("load paths from {}", out_dir.join("book.toml").display()))?
     } else {
         out_dir.join("src/packages")
@@ -417,7 +493,7 @@ fn book_links() -> Result<()> {
                 .display()
         );
     }
-    protoc_gen_mdbook::link_check::assert_tree(&out_dir).context("markdown link check")
+    protobuf_mdbook::link_check::assert_tree(&out_dir).context("markdown link check")
 }
 
 fn book_build() -> Result<()> {
@@ -466,7 +542,7 @@ fn rumdl_fmt() -> Result<()> {
     }
 }
 
-const DOCKER_IMAGE: &str = "protoc-gen-mdbook:local";
+const DOCKER_IMAGE: &str = "protobuf-mdbook:local";
 
 fn docker() -> Result<()> {
     docker_build()?;
@@ -522,7 +598,7 @@ fn docker_smoke_version() -> Result<()> {
     if !stdout.contains("protoc-gen-mdbook") {
         bail!("docker --version stdout missing plugin name: {stdout}");
     }
-    let pin = protoc_gen_mdbook::mdbook_version();
+    let pin = protobuf_mdbook::mdbook_version();
     if !stdout.contains(pin) {
         bail!("docker --version stdout missing mdbook pin {pin}: {stdout}");
     }
@@ -578,7 +654,7 @@ fn check_highlightjs_vendor() -> Result<()> {
         bail!("no *.meta.json under {}", highlight_dir.display());
     }
 
-    let compiled = protoc_gen_mdbook::mdbook_version();
+    let compiled = protobuf_mdbook::mdbook_version();
     let mut mdbook_pin_checked = false;
 
     for meta_path in &meta_paths {
@@ -602,7 +678,7 @@ fn check_highlightjs_vendor() -> Result<()> {
             if !compiled.contains(mdbook_pin) {
                 bail!(
                     "mdbook pin mismatch: meta.json mdbook_pin={mdbook_pin:?}, \
-                     protoc_gen_mdbook::mdbook_version()={compiled:?}"
+                     protobuf_mdbook::mdbook_version()={compiled:?}"
                 );
             }
             mdbook_pin_checked = true;
@@ -813,7 +889,7 @@ fn coverage(open: bool, lcov: bool, output_path: &Path) -> Result<()> {
         "llvm-cov",
         "--locked",
         "-p",
-        "protoc-gen-mdbook",
+        "protobuf-mdbook",
         "--all-targets",
     ];
     if open {

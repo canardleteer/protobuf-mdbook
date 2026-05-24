@@ -1,4 +1,4 @@
-# Contributor guide — `protoc-gen-mdbook`
+# Contributor guide — `protobuf-mdbook` & `protoc-gen-mdbook`
 
 ## Toolchain
 
@@ -12,9 +12,10 @@
 
 - **Pin:** root [`Cargo.toml`](Cargo.toml) `[workspace.dependencies]` entries
   `mdbook-core` and `mdbook-driver` (keep versions aligned).
-- **Runtime truth:** `protoc-gen-mdbook --version` / `-V` prints the compiled pin via
+- **Runtime truth:** `protobuf-mdbook --version` and `protoc-gen-mdbook --version` /
+  `-V` print the compiled pin via
   [`mdbook_core::MDBOOK_VERSION`](https://docs.rs/mdbook-core) (exposed as
-  `protoc_gen_mdbook::mdbook_version()` in the library).
+  `protobuf_mdbook::mdbook_version()` in the library).
 - **Do not** duplicate the mdBook version number in README, AGENTS, or comments —
   refer readers to `Cargo.toml` and `--version` instead.
 - **Bump workflow:** edit `Cargo.toml` only, run `cargo xtask ci`. Integration tests
@@ -96,7 +97,7 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
   `proto_deps::ensure_proto_deps_export` writes gitignored `target/proto-deps/` for protoc
   `-I` only — never pass exported files as inputs (`cargo xtask book-*` and link-check tests
   call it automatically).
-- Generated book at `./api-book/` (gitignored): CI runs `cargo xtask book-init --markdown-only` then `book-links`; local preview uses `book-init` once, then `book-refresh`.
+- Generated book at `./api-book/` (gitignored): CI runs `cargo xtask book-init --markdown-only` then `book-links`; local preview uses `book-init` once, then `book-refresh`. Guided tasks accept `--generator protoc` (default, CI) or `--generator cli` (`protobuf-mdbook` + Buf on `examples/proto/`).
 
 ## Output conventions
 
@@ -192,17 +193,25 @@ Human spot-check (full mdBook at repo root):
 ```bash
 cargo xtask book-init      # once: full mdBook at ./api-book
 cargo xtask book-refresh   # after proto edits; loads paths from book.toml via book=
+# Optional: --generator cli  (protobuf-mdbook + buf on examples/proto/)
 cd api-book && mdbook serve
 ```
 
-Guided `book-*` xtasks target `./api-book`. `book-refresh` passes `book=` /
+Guided `book-*` xtasks target `./api-book`. Default `--generator protoc`; `--generator cli`
+runs `protobuf-mdbook` instead. `book-refresh` passes `book=` /
 `mdbook_out=` so paths align with `[book] src` in `book.toml`.
 
 ## Tests
 
 - Unit tests in `lib` / `render` / `options` / `init` / `book_config`.
-- `tests/protoc_invocation.rs` — default markdown-only vs `init` mdBook tree; `--version` pin.
-- `tests/link_check.rs` — layout variants against `examples/proto/`; `book=` path inference.
+- `tests/protoc_invocation.rs` — fixture markdown-only vs `init` for **both** `protoc-gen-mdbook`
+  and `protobuf-mdbook --compiler protoc`; `--version` pins.
+- `tests/protobuf_mdbook.rs` — CLI-only paths: `--descriptor-set`, buf module root without
+  per-file filter.
+- `tests/link_check.rs` — layout/options variants for **both** backends (`protobuf-mdbook`
+  uses default buf on `examples/proto`; skipped when `buf` is not on PATH).
+- Shared helpers: [`tests/common/mod.rs`](tests/common/mod.rs) (`mirrored_backends`,
+  `mirrored_fixture_backends`, `run_examples`, `run_fixture`).
 - Required gate: `cargo xtask book-links` (part of `ci`, after `book-init --markdown-only`).
 - When iterating on markdown output: `cargo xtask book-init --markdown-only`, `cargo xtask book-links`.
 - Local coverage: `cargo xtask coverage --open` (requires `cargo install cargo-llvm-cov --locked`
@@ -210,14 +219,18 @@ Guided `book-*` xtasks target `./api-book`. `book-refresh` passes `book=` /
 
 ## Protoc plugin contract
 
-- **Stock `protoc`** is the ground truth: integration tests spawn
+- **Stock `protoc`** is the ground truth for the plugin binary: integration tests spawn
   [`protoc-bin-vendored`](https://docs.rs/protoc-bin-vendored) and pass
   `--plugin=protoc-gen-mdbook=…` / `--mdbook_out=…`.
-- **Lib + bin layout:** `generate()` lives in `src/lib.rs`; `src/main.rs` only
-  reads stdin and writes stdout so tests exercise generator logic directly.
+- **Standalone CLI:** `protobuf-mdbook` (`src/bin/protobuf-mdbook.rs`) resolves inputs
+  via [`src/input.rs`](src/input.rs) — default **`buf build`** on a Buf module,
+  `--compiler protoc` for loose proto trees, or `--descriptor-set` for prebuilt FDS.
+  Shares `generate_from_input()` / `write_generated_files()` with the plugin.
+- **Lib + bin layout:** `generate()` in `src/lib.rs` decodes plugin requests;
+  `src/main.rs` is stdin/stdout only; `protobuf-mdbook` writes to `-o`.
 - **Vendored `protoc` caveat:** the bundled binary can fail on exotic hosts
-  (some NixOS / musl-only setups). Document any agreed escape hatch in code or
-  README if you add one.
+  (some NixOS / musl-only setups). The CLI falls back to vendored protoc only when
+  `--compiler protoc` is used and `protoc` is not on PATH.
 
 ## CI
 

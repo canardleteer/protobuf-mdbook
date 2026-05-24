@@ -22,8 +22,18 @@ const CEL_HIGHLIGHT_JS: &str = include_str!(concat!(
     "/assets/highlightjs/cel-10.js"
 ));
 
-const SYNTAX_HIGHLIGHT_BEGIN: &str = "protoc-gen-mdbook: syntax highlight begin";
-const SYNTAX_HIGHLIGHT_END: &str = "protoc-gen-mdbook: syntax highlight end";
+const SYNTAX_HIGHLIGHT_BEGIN: &str = "protobuf-mdbook: syntax highlight begin";
+const SYNTAX_HIGHLIGHT_END: &str = "protobuf-mdbook: syntax highlight end";
+const LEGACY_SYNTAX_HIGHLIGHT_BEGIN: &str = "protoc-gen-mdbook: syntax highlight begin";
+
+fn index_has_syntax_highlight_block(index: &str) -> bool {
+    index.contains(SYNTAX_HIGHLIGHT_BEGIN) || index.contains(LEGACY_SYNTAX_HIGHLIGHT_BEGIN)
+}
+
+fn book_toml_has_syntax_highlight_comment(book: &str) -> bool {
+    book.contains("protobuf-mdbook: syntax highlighting")
+        || book.contains("protoc-gen-mdbook: syntax highlighting")
+}
 
 /// Paths from mdBook init that should not appear in plugin output (replaced by generated docs).
 const MDBOOK_DEFAULT_SUMMARY: &str = "src/SUMMARY.md";
@@ -44,26 +54,26 @@ const THEME_HIGHLIGHT_JS: &str = r#"<script src="{{ resource "highlight.js" }}">
 const THEME_BOOK_JS: &str = r#"<script src="{{ resource "book.js" }}"></script>"#;
 
 const BOOK_TOML_HIGHLIGHT_ENABLED: &str = r#"
-# --- protoc-gen-mdbook: syntax highlighting (enabled at init) ---
+# --- protobuf-mdbook: syntax highlighting (enabled at init) ---
 # Generated API pages use ```protobuf fences; Protovalidate message-level CEL rules also
 # emit ```cel fences. Init patches theme/index.hbs with inline <script> grammars after
 # highlight.js and before book.js (mdBook does not bundle arbitrary theme/*.js via
 # {{ resource }} — only inlined scripts in index.hbs are reliable).
 #
-# To disable: delete the "protoc-gen-mdbook: syntax highlight" block in theme/index.hbs and
+# To disable: delete the "protobuf-mdbook: syntax highlight" block in theme/index.hbs and
 # optional theme/highlight-*.js reference copies. On a future init:
 #   no_proto_highlight — skip protobuf grammar only
 #   no_cel_highlight   — skip CEL grammar only (protobuf can stay on)
 # Re-init does not replace an existing highlight block when markers are already present.
 # See the plugin repository README (Syntax highlighting) for custom themes and limitations.
 # Attribution: assets/highlightjs/NOTICE (protobuf: BSD-3-Clause; cel: repo-authored).
-# --- end protoc-gen-mdbook syntax highlighting ---
+# --- end protobuf-mdbook syntax highlighting ---
 "#;
 
 const BOOK_TOML_HIGHLIGHT_DISABLED: &str = r#"
-# --- protoc-gen-mdbook: syntax highlighting (disabled at init) ---
+# --- protobuf-mdbook: syntax highlighting (disabled at init) ---
 # Pass init without no_proto_highlight / no_cel_highlight, or patch theme/index.hbs yourself.
-# --- end protoc-gen-mdbook syntax highlighting ---
+# --- end protobuf-mdbook syntax highlighting ---
 "#;
 
 /// Inline Highlight.js grammars for `theme/index.hbs`.
@@ -170,7 +180,7 @@ fn inject_syntax_highlighting(opts: &Options, book_root: &str, out: &mut HashMap
 
     let index_key = join_book_root(book_root, "theme/index.hbs");
     if let Some(index) = out.get_mut(&index_key)
-        && !index.contains(SYNTAX_HIGHLIGHT_BEGIN)
+        && !index_has_syntax_highlight_block(index)
         && let Some(pos) = index.find(THEME_HIGHLIGHT_JS)
     {
         let insert_at = pos + THEME_HIGHLIGHT_JS.len();
@@ -195,7 +205,7 @@ fn append_book_toml_highlight_comment(
     };
     match out.get_mut(&book_key) {
         Some(book) => {
-            if !book.contains("protoc-gen-mdbook: syntax highlighting") {
+            if !book_toml_has_syntax_highlight_comment(book) {
                 book.push_str(comment);
             }
         }
@@ -217,7 +227,7 @@ pub fn init_readme_content(opts: &Options) -> String {
             "## Syntax highlighting".to_string(),
             String::new(),
             "Init patches `theme/index.hbs` with Highlight.js 10.1.1 grammars between \
-             `highlight.js` and `book.js`. See the **protoc-gen-mdbook** repository README \
+             `highlight.js` and `book.js`. See the **protobuf-mdbook** repository README \
              (**Syntax highlighting**) for custom themes, re-init behavior, and CEL limitations."
                 .to_string(),
         ];
@@ -248,7 +258,7 @@ README for how to add grammars manually.
     format!(
         r#"# Generated mdBook project
 
-This file was created by **protoc-gen-mdbook** when you passed `init`. You can edit or delete it.
+This file was created by **protobuf-mdbook** when you passed `init`. You can edit or delete it.
 
 ## Next steps
 
@@ -261,13 +271,14 @@ This file was created by **protoc-gen-mdbook** when you passed `init`. You can e
    mdbook build
    ```
 
-   The plugin reports its pinned mdBook version:
+   The generator reports its pinned mdBook version:
 
    ```bash
-   protoc-gen-mdbook --version
+   protobuf-mdbook --version
+   # or: protoc-gen-mdbook --version
    ```
 
-   Expected pin: **{mdbook_ver}** (also declared in the plugin crate `Cargo.toml`).
+   Expected pin: **{mdbook_ver}** (also declared in the crate `Cargo.toml`).
 
 {highlight_section}## Diagrams (` ```mermaid ` fences)
 
@@ -332,6 +343,21 @@ mod tests {
         let readme = init_readme_content(&opts);
         assert!(readme.contains("content/api"));
         assert!(readme.contains("content/SUMMARY.md"));
+    }
+
+    #[test]
+    fn inject_skips_when_legacy_highlight_markers_present() {
+        let opts = parse_parameter(&Some("init".into())).unwrap();
+        let mut out = HashMap::from([(
+            "theme/index.hbs".to_string(),
+            format!(
+                "head\n{THEME_HIGHLIGHT_JS}\n<!-- protoc-gen-mdbook: syntax highlight begin -->\n<!-- protoc-gen-mdbook: syntax highlight end -->\n{THEME_BOOK_JS}\n"
+            ),
+        )]);
+        inject_syntax_highlighting(&opts, ".", &mut out);
+        let index = out.get("theme/index.hbs").expect("index.hbs");
+        assert!(index.contains("protoc-gen-mdbook: syntax highlight begin"));
+        assert!(!index.contains("protobuf-mdbook: syntax highlight begin"));
     }
 
     #[test]
