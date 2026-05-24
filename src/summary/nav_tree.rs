@@ -4,6 +4,7 @@ use crate::options::Layout;
 use crate::plugin_api::FileDescriptorProto;
 use crate::proto_markdown::{CompanionDoc, module_path_from_companion_output};
 use crate::render::links::LinkContext;
+use crate::summary::chapters::{entity_summary_items, package_target};
 use crate::summary::render_md::{SUMMARY_MAX_DEPTH, link_path_for_summary};
 use mdbook_summary::{Link, Summary, SummaryItem};
 use std::collections::BTreeMap;
@@ -70,7 +71,7 @@ pub fn build_summary(
         let target = package_target(input.links, layout, info.package);
         let path = link_path_for_summary(input.summary_from, &target);
         let entity_items = if attach_entities {
-            super::entity_summary_items(info.package, info.files, input.links, input.summary_from)
+            entity_summary_items(info.package, info.files, input.links, input.summary_from)
         } else {
             Vec::new()
         };
@@ -125,13 +126,6 @@ fn insert_at(node: &mut DirNode, segments: Vec<String>, entry: LinkEntry, kind: 
     let head = segments[0].clone();
     let tail = segments[1..].to_vec();
     insert_at(node.children.entry(head).or_default(), tail, entry, kind);
-}
-
-fn package_target(links: &LinkContext, layout: Layout, package: &str) -> PathBuf {
-    match layout {
-        Layout::Package => links.package_page_rel(package),
-        Layout::Entity | Layout::Split => links.package_index_rel(package),
-    }
 }
 
 /// Collapse nodes with no companions, no packages, and exactly one child.

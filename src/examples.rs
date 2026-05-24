@@ -19,17 +19,48 @@ pub fn examples_proto_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/proto")
 }
 
-/// Same list as [`EXAMPLE_PROTO_INPUTS`].
-pub fn example_proto_inputs() -> &'static [&'static str] {
-    EXAMPLE_PROTO_INPUTS
+/// Flags for building comma-separated `--mdbook_opt` strings.
+#[derive(Clone, Debug, Default)]
+pub struct MdbookOptFlags {
+    pub summary: bool,
+    pub init: bool,
+    /// When set, append `book=` and `mdbook_out=` for guided book refresh.
+    pub with_book_paths: Option<(String, String)>,
+    /// Append `proto_path=.` (integration tests on examples/proto).
+    pub include_proto_path: bool,
+}
+
+/// Comma-separated plugin options for example runs.
+pub fn format_mdbook_opt(layout: &str, extra_opt: &str, flags: MdbookOptFlags) -> String {
+    let mut parts = Vec::new();
+    if flags.init {
+        parts.push("init".to_string());
+    }
+    parts.push(format!("layout={layout}"));
+    if flags.summary {
+        parts.push("summary".into());
+    }
+    if flags.include_proto_path {
+        parts.push("proto_path=.".into());
+    }
+    if let Some((book, mdbook_out)) = flags.with_book_paths {
+        parts.push(format!("book={book}"));
+        parts.push(format!("mdbook_out={mdbook_out}"));
+    }
+    if !extra_opt.is_empty() {
+        parts.push(extra_opt.to_string());
+    }
+    parts.join(",")
 }
 
 /// Comma-separated plugin options for example runs (`layout=…`, `proto_path=.`).
 pub fn format_examples_mdbook_opt(layout: &str, extra_opt: &str) -> String {
-    let mut opt = format!("layout={layout},proto_path=.");
-    if !extra_opt.is_empty() {
-        opt.push(',');
-        opt.push_str(extra_opt);
-    }
-    opt
+    format_mdbook_opt(
+        layout,
+        extra_opt,
+        MdbookOptFlags {
+            include_proto_path: true,
+            ..MdbookOptFlags::default()
+        },
+    )
 }

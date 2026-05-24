@@ -4,6 +4,9 @@ use crate::ci::{buf_command, build_plugin, release_bin};
 use crate::workspace::WORKSPACE_ROOT;
 use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
+use protobuf_mdbook::examples::{MdbookOptFlags, format_mdbook_opt};
+use protobuf_mdbook::input::Compiler;
+use protobuf_mdbook::runner::{Driver, RunSpec, run_generation};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -24,26 +27,8 @@ fn api_book() -> PathBuf {
     Path::new(WORKSPACE_ROOT).join(API_BOOK_DIR)
 }
 
-/// `--mdbook_opt` for guided `./api-book` runs.
-fn mdbook_opt(layout: &str, summary: bool, init: bool, with_book: bool) -> String {
-    let mut opt = if init {
-        format!("init,layout={layout}")
-    } else {
-        format!("layout={layout}")
-    };
-    if summary {
-        opt.push_str(",summary");
-    }
-    if with_book {
-        let book = api_book();
-        let book_s = book.to_string_lossy();
-        opt.push_str(&format!(",book={book_s},mdbook_out={book_s}"));
-    }
-    opt
-}
-
 fn example_proto_paths() -> Vec<PathBuf> {
-    protobuf_mdbook::examples::example_proto_inputs()
+    protobuf_mdbook::examples::EXAMPLE_PROTO_INPUTS
         .iter()
         .map(|rel| PathBuf::from(*rel))
         .collect()
@@ -78,73 +63,43 @@ fn protoc_bin() -> Result<PathBuf> {
     Ok(PathBuf::from(env!("PROTOC_BIN")))
 }
 
-fn run_protoc_on_examples(out_dir: &Path, mdbook_opt: &str) -> Result<()> {
+fn driver_for(generator: GeneratorArg) -> Result<Driver> {
     build_plugin()?;
-    let protoc = protoc_bin()?;
-    let plugin = release_bin("protoc-gen-mdbook")?;
-    let proto_root = protobuf_mdbook::examples::examples_proto_dir();
-    let inputs = prepare_example_output(out_dir, mdbook_opt)?;
-    eprintln!(
-        "xtask: protoc {} proto file(s) → {} (opt={mdbook_opt})",
-        inputs.len(),
-        out_dir.display()
-    );
-
-    let deps = ensure_proto_deps_export()?;
-    let mut cmd = Command::new(protoc);
-    cmd.current_dir(&proto_root)
-        .arg("-I")
-        .arg(".")
-        .arg("-I")
-        .arg(&deps)
-        .arg(format!("--plugin=protoc-gen-mdbook={}", plugin.display()))
-        .arg(format!("--mdbook_out={}", out_dir.display()))
-        .arg(format!("--mdbook_opt={mdbook_opt}"));
-    for rel in &inputs {
-        cmd.arg(rel);
+    match generator {
+        GeneratorArg::Protoc => Ok(Driver::protoc_plugin(
+            protoc_bin()?,
+            release_bin("protoc-gen-mdbook")?,
+        )),
+        GeneratorArg::Cli => {
+            buf_command()?;
+            Ok(Driver::cli(release_bin("protobuf-mdbook")?, Compiler::Buf))
+        }
     }
-    let status = cmd.status().context("protoc")?;
-    if !status.success() {
-        bail!("protoc failed");
-    }
-    Ok(())
-}
-
-fn run_cli_on_examples(out_dir: &Path, mdbook_opt: &str) -> Result<()> {
-    build_plugin()?;
-    buf_command()?;
-    let cli = release_bin("protobuf-mdbook")?;
-    let proto_root = protobuf_mdbook::examples::examples_proto_dir();
-    let inputs = prepare_example_output(out_dir, mdbook_opt)?;
-    eprintln!(
-        "xtask: protobuf-mdbook {} proto file(s) → {} (opt={mdbook_opt})",
-        inputs.len(),
-        out_dir.display()
-    );
-
-    let cli_args = protobuf_mdbook::options::parameter_to_cli_args(mdbook_opt)?;
-
-    let mut cmd = Command::new(cli);
-    cmd.current_dir(&proto_root).arg("-o").arg(out_dir);
-    for arg in &cli_args {
-        cmd.arg(arg);
-    }
-    cmd.arg("-I").arg(".");
-    for rel in &inputs {
-        cmd.arg(rel);
-    }
-    let status = cmd.status().context("protobuf-mdbook")?;
-    if !status.success() {
-        bail!("protobuf-mdbook failed");
-    }
-    Ok(())
 }
 
 fn run_on_examples(out_dir: &Path, mdbook_opt: &str, generator: GeneratorArg) -> Result<()> {
-    match generator {
-        GeneratorArg::Protoc => run_protoc_on_examples(out_dir, mdbook_opt),
-        GeneratorArg::Cli => run_cli_on_examples(out_dir, mdbook_opt),
-    }
+    let inputs = prepare_example_output(out_dir, mdbook_opt)?;
+    eprintln!(
+        "xtask: {} {} proto file(s) → {} (opt={mdbook_opt})",
+        match generator {
+            GeneratorArg::Protoc => "protoc",
+            GeneratorArg::Cli => "protobuf-mdbook",
+        },
+        inputs.len(),
+        out_dir.display()
+    );
+
+    let proto_root = protobuf_mdbook::examples::examples_proto_dir();
+    let deps = ensure_proto_deps_export()?;
+    let search_paths = vec![PathBuf::from("."), deps];
+    let spec = RunSpec {
+        out: out_dir,
+        mdbook_opt,
+        inputs: &inputs,
+        search_paths: &search_paths,
+        cwd: Some(&proto_root),
+    };
+    run_generation(&spec, &driver_for(generator)?)
 }
 
 pub fn book_init(
@@ -158,7 +113,16 @@ pub fn book_init(
         std::fs::remove_dir_all(&out).context("clear api-book before markdown-only init")?;
     }
     let init = !markdown_only;
-    run_on_examples(&out, &mdbook_opt(layout, summary, init, false), generator)
+    let opt = format_mdbook_opt(
+        layout,
+        "",
+        MdbookOptFlags {
+            summary,
+            init,
+            ..MdbookOptFlags::default()
+        },
+    );
+    run_on_examples(&out, &opt, generator)
 }
 
 pub fn book_refresh(layout: &str, summary: bool, generator: GeneratorArg) -> Result<()> {
@@ -169,7 +133,17 @@ pub fn book_refresh(layout: &str, summary: bool, generator: GeneratorArg) -> Res
             out.display()
         );
     }
-    run_on_examples(&out, &mdbook_opt(layout, summary, false, true), generator)
+    let book_s = out.to_string_lossy().into_owned();
+    let opt = format_mdbook_opt(
+        layout,
+        "",
+        MdbookOptFlags {
+            summary,
+            with_book_paths: Some((book_s.clone(), book_s)),
+            ..MdbookOptFlags::default()
+        },
+    );
+    run_on_examples(&out, &opt, generator)
 }
 
 pub fn book_links() -> Result<()> {

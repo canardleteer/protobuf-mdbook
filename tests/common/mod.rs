@@ -2,15 +2,42 @@
 
 #![allow(dead_code)]
 
+pub use protobuf_mdbook::examples::EXAMPLE_PROTO_INPUTS;
+use protobuf_mdbook::examples::format_examples_mdbook_opt;
+use protobuf_mdbook::input::Compiler;
+use protobuf_mdbook::runner::{Driver, RunSpec, run_generation};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-
-pub const EXAMPLE_PROTO_INPUTS: &[&str] = protobuf_mdbook::examples::EXAMPLE_PROTO_INPUTS;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Backend {
     ProtocPlugin,
     ProtobufMdbook,
+}
+
+impl Backend {
+    fn driver(self) -> Driver {
+        match self {
+            Backend::ProtocPlugin => Driver::protoc_plugin(
+                protoc_bin_vendored::protoc_bin_path().expect("vendored protoc"),
+                PathBuf::from(env!("CARGO_BIN_EXE_protoc-gen-mdbook")),
+            ),
+            Backend::ProtobufMdbook => Driver::cli(
+                PathBuf::from(env!("CARGO_BIN_EXE_protobuf-mdbook")),
+                Compiler::Buf,
+            ),
+        }
+    }
+
+    fn fixture_driver(self) -> Driver {
+        match self {
+            Backend::ProtocPlugin => self.driver(),
+            Backend::ProtobufMdbook => Driver::cli(
+                PathBuf::from(env!("CARGO_BIN_EXE_protobuf-mdbook")),
+                Compiler::Protoc,
+            ),
+        }
+    }
 }
 
 pub fn manifest_dir() -> PathBuf {
@@ -60,10 +87,31 @@ pub fn ensure_proto_deps_export() -> PathBuf {
 }
 
 pub fn run_examples_in(out: &Path, layout: &str, extra_opt: &str, backend: Backend) {
-    match backend {
-        Backend::ProtocPlugin => run_protoc_examples_in(out, layout, extra_opt),
-        Backend::ProtobufMdbook => run_cli_examples_in(out, layout, extra_opt),
-    }
+    run_examples_proto_in(out, EXAMPLE_PROTO_INPUTS, layout, extra_opt, backend);
+}
+
+pub fn run_examples_proto_in(
+    out: &Path,
+    proto_inputs: &[&str],
+    layout: &str,
+    extra_opt: &str,
+    backend: Backend,
+) {
+    let proto_dir = examples_proto_dir();
+    let deps = ensure_proto_deps_export();
+    let opt = format_examples_mdbook_opt(layout, extra_opt);
+    let inputs: Vec<PathBuf> = proto_inputs.iter().map(|rel| PathBuf::from(*rel)).collect();
+    let search_paths = vec![PathBuf::from("."), deps];
+    let spec = RunSpec {
+        out,
+        mdbook_opt: &opt,
+        inputs: &inputs,
+        search_paths: &search_paths,
+        cwd: Some(&proto_dir),
+    };
+    run_generation(&spec, &backend.driver()).unwrap_or_else(|e| {
+        panic!("examples generation layout={layout} opt={extra_opt} ({backend:?}): {e:#}")
+    });
 }
 
 pub fn run_examples(layout: &str, extra_opt: &str, backend: Backend) -> tempfile::TempDir {
@@ -72,121 +120,24 @@ pub fn run_examples(layout: &str, extra_opt: &str, backend: Backend) -> tempfile
     out
 }
 
-fn run_protoc_examples_in(out: &Path, layout: &str, extra_opt: &str) {
-    let protoc = protoc_bin_vendored::protoc_bin_path().expect("vendored protoc");
-    let plugin: PathBuf = env!("CARGO_BIN_EXE_protoc-gen-mdbook").into();
-    let proto_dir = examples_proto_dir();
-    let deps = ensure_proto_deps_export();
-
-    let opt = protobuf_mdbook::examples::format_examples_mdbook_opt(layout, extra_opt);
-
-    let mut cmd = Command::new(protoc);
-    cmd.current_dir(&proto_dir)
-        .arg("-I")
-        .arg(".")
-        .arg("-I")
-        .arg(deps.to_str().expect("utf8 proto-deps path"))
-        .arg(format!("--plugin=protoc-gen-mdbook={}", plugin.display()))
-        .arg(format!("--mdbook_out={}", out.display()))
-        .arg(format!("--mdbook_opt={opt}"));
-    for rel in EXAMPLE_PROTO_INPUTS {
-        cmd.arg(rel);
-    }
-    let status = cmd.status().expect("spawn protoc");
-    assert!(status.success(), "protoc layout={layout} opt={extra_opt}");
-}
-
-fn run_cli_examples_in(out: &Path, layout: &str, extra_opt: &str) {
-    let cli: PathBuf = env!("CARGO_BIN_EXE_protobuf-mdbook").into();
-    let proto_dir = examples_proto_dir();
-
-    let opt = protobuf_mdbook::examples::format_examples_mdbook_opt(layout, extra_opt);
-    let cli_args = protobuf_mdbook::options::parameter_to_cli_args(&opt).expect("cli args");
-
-    let mut cmd = Command::new(cli);
-    cmd.current_dir(&proto_dir).arg("-o").arg(out);
-    for arg in &cli_args {
-        cmd.arg(arg);
-    }
-    cmd.arg("-I").arg(".");
-    for rel in EXAMPLE_PROTO_INPUTS {
-        cmd.arg(rel);
-    }
-    let status = cmd.status().expect("spawn protobuf-mdbook");
-    assert!(
-        status.success(),
-        "protobuf-mdbook layout={layout} opt={extra_opt}"
-    );
-}
-
-pub fn run_fixture_protoc(out: &Path, extra_opt: &str) {
-    run_fixture_protoc_proto(out, "doc_rich.proto", extra_opt);
-}
-
-pub fn run_fixture_protoc_proto(out: &Path, proto_file: &str, extra_opt: &str) {
-    let protoc = protoc_bin_vendored::protoc_bin_path().expect("vendored protoc");
-    let plugin: PathBuf = env!("CARGO_BIN_EXE_protoc-gen-mdbook").into();
+pub fn run_fixture_proto_in(out: &Path, proto_file: &str, extra_opt: &str, backend: Backend) {
     let fixture_dir = fixtures_dir();
-    let plugin_arg = format!("--plugin=protoc-gen-mdbook={}", plugin.display());
-    let out_arg = format!("--mdbook_out={}", out.display());
-
-    let mut cmd = Command::new(protoc);
-    cmd.args([
-        "-I",
-        fixture_dir.to_str().expect("utf8"),
-        &plugin_arg,
-        &out_arg,
-    ]);
-    if !extra_opt.is_empty() {
-        cmd.arg(format!("--mdbook_opt={extra_opt}"));
-    }
-    cmd.arg(proto_file);
-
-    let status = cmd.status().expect("spawn protoc");
-    assert!(
-        status.success(),
-        "protoc fixture proto={proto_file} opt={extra_opt}"
-    );
-}
-
-pub fn run_fixture_cli(out: &Path, extra_opt: &str) {
-    run_fixture_cli_proto(out, "doc_rich.proto", extra_opt);
-}
-
-pub fn run_fixture_cli_proto(out: &Path, proto_file: &str, extra_opt: &str) {
-    let cli: PathBuf = env!("CARGO_BIN_EXE_protobuf-mdbook").into();
-    let fixture_dir = fixtures_dir();
-
-    let mut cmd = Command::new(cli);
-    cmd.arg("-o")
-        .arg(out)
-        .args(["--compiler", "protoc", "-I"])
-        .arg(&fixture_dir)
-        .arg(proto_file)
-        .current_dir(&fixture_dir);
-    if !extra_opt.is_empty() {
-        let cli_args =
-            protobuf_mdbook::options::parameter_to_cli_args(extra_opt).expect("cli args");
-        for arg in &cli_args {
-            cmd.arg(arg);
-        }
-    }
-    let status = cmd.status().expect("spawn protobuf-mdbook");
-    assert!(
-        status.success(),
-        "protobuf-mdbook fixture proto={proto_file} opt={extra_opt}"
-    );
+    let inputs = vec![PathBuf::from(proto_file)];
+    let search_paths = vec![fixture_dir.clone()];
+    let spec = RunSpec {
+        out,
+        mdbook_opt: extra_opt,
+        inputs: &inputs,
+        search_paths: &search_paths,
+        cwd: Some(&fixture_dir),
+    };
+    run_generation(&spec, &backend.fixture_driver()).unwrap_or_else(|e| {
+        panic!("fixture proto={proto_file} opt={extra_opt} ({backend:?}): {e:#}")
+    });
 }
 
 pub fn run_fixture_in(out: &Path, extra_opt: &str, backend: Backend) {
     run_fixture_proto_in(out, "doc_rich.proto", extra_opt, backend);
-}
-
-pub fn run_fixture_proto_in(out: &Path, proto_file: &str, extra_opt: &str, backend: Backend) {
-    match backend {
-        Backend::ProtocPlugin => run_fixture_protoc_proto(out, proto_file, extra_opt),
-        Backend::ProtobufMdbook => run_fixture_cli_proto(out, proto_file, extra_opt),
-    }
 }
 
 pub fn run_fixture(extra_opt: &str, backend: Backend) -> tempfile::TempDir {
@@ -254,45 +205,38 @@ pub fn assert_fixture_init(out: &Path) {
 }
 
 pub fn run_single_echo_package(out: &Path, backend: Backend) {
-    match backend {
-        Backend::ProtocPlugin => {
-            let protoc = protoc_bin_vendored::protoc_bin_path().expect("vendored protoc");
-            let plugin: PathBuf = env!("CARGO_BIN_EXE_protoc-gen-mdbook").into();
-            let proto_dir = examples_proto_dir();
-            let deps = ensure_proto_deps_export();
-            let status = Command::new(protoc)
-                .current_dir(&proto_dir)
-                .args([
-                    "-I",
-                    ".",
-                    "-I",
-                    deps.to_str().expect("utf8 proto-deps path"),
-                    &format!("--plugin=protoc-gen-mdbook={}", plugin.display()),
-                    &format!("--mdbook_out={}", out.display()),
-                    "--mdbook_opt=layout=package",
-                    "acme/example/v1/echo.proto",
-                ])
-                .status()
-                .expect("spawn protoc");
-            assert!(status.success());
+    run_examples_proto_in(out, &["acme/example/v1/echo.proto"], "package", "", backend);
+}
+
+/// Build a descriptor set for `doc_rich.proto` via vendored protoc.
+pub fn build_fixture_fds() -> tempfile::NamedTempFile {
+    let protoc = protoc_bin_vendored::protoc_bin_path().expect("vendored protoc");
+    let fixture_dir = fixtures_dir();
+    let fds = tempfile::NamedTempFile::new().expect("temp fds");
+    let status = Command::new(protoc)
+        .args([
+            "-I",
+            fixture_dir.to_str().expect("utf8"),
+            "--descriptor_set_out",
+            fds.path().to_str().expect("utf8"),
+            "--include_imports",
+            "doc_rich.proto",
+        ])
+        .status()
+        .expect("spawn protoc");
+    assert!(status.success(), "protoc descriptor_set_out failed");
+    fds
+}
+
+/// Run a test body for each backend returned by `mirrored_backends()`.
+#[macro_export]
+macro_rules! mirrored_test {
+    ($name:ident, $body:expr) => {
+        #[test]
+        fn $name() {
+            for backend in $crate::common::mirrored_backends() {
+                $body(backend);
+            }
         }
-        Backend::ProtobufMdbook => {
-            let cli: PathBuf = env!("CARGO_BIN_EXE_protobuf-mdbook").into();
-            let proto_dir = examples_proto_dir();
-            let status = Command::new(cli)
-                .current_dir(&proto_dir)
-                .args([
-                    "-o",
-                    out.to_str().expect("utf8"),
-                    "--layout",
-                    "package",
-                    "-I",
-                    ".",
-                    "acme/example/v1/echo.proto",
-                ])
-                .status()
-                .expect("spawn protobuf-mdbook");
-            assert!(status.success());
-        }
-    }
+    };
 }

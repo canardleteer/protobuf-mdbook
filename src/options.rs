@@ -1,7 +1,13 @@
 //! Plugin options from `request.parameter`.
 
+mod table;
+
 use anyhow::{Result, bail};
 use std::path::PathBuf;
+
+use table::{
+    apply_parsed, build_options_from_cli as build_from_cli, is_markdown_only, parse_token,
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Layout {
@@ -119,90 +125,15 @@ pub fn parse_parameter(parameter: &Option<String>) -> Result<Options> {
     };
 
     for token in param.split(',').map(str::trim).filter(|s| !s.is_empty()) {
-        apply_option_token(&mut opts, token, &mut saw_markdown_only)?;
+        let parsed = parse_token(token)?;
+        if is_markdown_only(&parsed) {
+            saw_markdown_only = true;
+        }
+        apply_parsed(&mut opts, parsed);
     }
 
     validate_options(&opts, saw_markdown_only)?;
     Ok(opts)
-}
-
-/// Apply one comma-separated plugin option token.
-fn apply_option_token(opts: &mut Options, token: &str, saw_markdown_only: &mut bool) -> Result<()> {
-    if let Some(v) = token.strip_prefix("book_root=") {
-        opts.book_root = normalize_book_root(v);
-        opts.explicit_book_root = true;
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("markdown_root=") {
-        opts.markdown_root = normalize_rel_path(v, default_markdown_root())?;
-        opts.explicit_markdown_root = true;
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("summary_path=") {
-        opts.summary_path = normalize_rel_path(v, default_summary_path())?;
-        opts.explicit_summary_path = true;
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("book=") {
-        opts.book = Some(v.to_string());
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("mdbook_out=") {
-        opts.mdbook_out = Some(v.to_string());
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("title=") {
-        opts.title = Some(v.to_string());
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("ignore=") {
-        opts.ignore_git = match v {
-            "git" => true,
-            "none" => false,
-            other => bail!("unknown ignore value {other:?}; use git or none"),
-        };
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("proto_path=") {
-        opts.proto_search_path = v
-            .split(':')
-            .filter(|s| !s.is_empty())
-            .map(PathBuf::from)
-            .collect();
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("layout=") {
-        opts.layout = match v {
-            "package" => Layout::Package,
-            "entity" => Layout::Entity,
-            "split" => Layout::Split,
-            other => bail!("unknown layout {other:?}; use package, entity, or split"),
-        };
-        return Ok(());
-    }
-    if token == "escape_tags" {
-        opts.escape_tags = EscapeTags::Backticks;
-        return Ok(());
-    }
-    if let Some(v) = token.strip_prefix("escape_tags=") {
-        opts.escape_tags = match v {
-            "backticks" => EscapeTags::Backticks,
-            "entities" => EscapeTags::Entities,
-            other => bail!("unknown escape_tags value {other:?}; use backticks or entities"),
-        };
-        return Ok(());
-    }
-
-    match token {
-        "init" => opts.init = true,
-        "summary" => opts.summary = true,
-        "no_proto_highlight" => opts.no_proto_highlight = true,
-        "no_cel_highlight" => opts.no_cel_highlight = true,
-        "no_proto_markdown" => opts.no_proto_markdown = true,
-        "markdown_only" => *saw_markdown_only = true,
-        other => bail!("unknown plugin option: {other:?}"),
-    }
-    Ok(())
 }
 
 /// Init-only and deprecated-option checks after all tokens are applied.
@@ -233,29 +164,7 @@ pub fn validate_options(opts: &Options, saw_markdown_only: bool) -> Result<()> {
     Ok(())
 }
 
-fn normalize_book_root(root: &str) -> String {
-    normalize_rel_path(root, ".").expect("book_root validated")
-}
-
-fn normalize_rel_path(path: &str, default: &str) -> Result<String> {
-    let path = path.trim().trim_matches('/');
-    if path.is_empty() {
-        return Ok(default.to_string());
-    }
-    if path.contains("..") {
-        bail!("path must not contain `..`: {path:?}");
-    }
-    Ok(path.replace('\\', "/"))
-}
-
-pub fn join_book_root(book_root: &str, rel: &str) -> String {
-    let rel = rel.trim_start_matches('/');
-    if book_root == "." {
-        rel.to_string()
-    } else {
-        format!("{book_root}/{rel}")
-    }
-}
+pub use crate::paths::join_book_root;
 
 /// Fields collected from native `protobuf-mdbook` clap flags.
 #[derive(Clone, Debug)]
@@ -297,108 +206,19 @@ impl Default for CliOptionsInput {
 
 /// Build validated [`Options`] from native CLI flags.
 pub fn build_options_from_cli(input: CliOptionsInput) -> Result<Options> {
-    let mut opts = Options {
-        init: input.init,
-        summary: input.summary,
-        layout: input.layout,
-        book: input.book,
-        title: input.title,
-        ignore_git: input.ignore_git,
-        no_proto_highlight: input.no_proto_highlight,
-        no_cel_highlight: input.no_cel_highlight,
-        no_proto_markdown: input.no_proto_markdown,
-        escape_tags: input.escape_tags,
-        ..Options::default()
-    };
-
-    if let Some(v) = input.book_root {
-        opts.book_root = normalize_book_root(&v);
-        opts.explicit_book_root = true;
-    }
-    if let Some(v) = input.markdown_root {
-        opts.markdown_root = normalize_rel_path(&v, default_markdown_root())?;
-        opts.explicit_markdown_root = true;
-    }
-    if let Some(v) = input.summary_path {
-        opts.summary_path = normalize_rel_path(&v, default_summary_path())?;
-        opts.explicit_summary_path = true;
-    }
-
+    let opts = build_from_cli(input)?;
     validate_options(&opts, false)?;
     Ok(opts)
 }
 
 /// Map parsed options to native `protobuf-mdbook` argv tokens (excluding `-o`, `-I`, inputs).
-pub fn options_to_cli_args(opts: &Options) -> Vec<String> {
-    let mut args = Vec::new();
-    if opts.init {
-        args.push("--init".into());
-    }
-    if opts.summary {
-        args.push("--summary".into());
-    }
-    if opts.layout != Layout::Package {
-        args.push("--layout".into());
-        args.push(layout_name(opts.layout).into());
-    }
-    if opts.explicit_book_root {
-        args.push("--book-root".into());
-        args.push(opts.book_root.clone());
-    }
-    if let Some(book) = &opts.book {
-        args.push("--book".into());
-        args.push(book.clone());
-    }
-    if opts.explicit_markdown_root {
-        args.push("--markdown-root".into());
-        args.push(opts.markdown_root.clone());
-    }
-    if opts.explicit_summary_path {
-        args.push("--summary-path".into());
-        args.push(opts.summary_path.clone());
-    }
-    if let Some(title) = &opts.title {
-        args.push("--title".into());
-        args.push(title.clone());
-    }
-    if !opts.ignore_git {
-        args.push("--ignore".into());
-        args.push("none".into());
-    }
-    if opts.no_proto_highlight {
-        args.push("--no-proto-highlight".into());
-    }
-    if opts.no_cel_highlight {
-        args.push("--no-cel-highlight".into());
-    }
-    if opts.no_proto_markdown {
-        args.push("--no-proto-markdown".into());
-    }
-    match opts.escape_tags {
-        EscapeTags::Off => {}
-        EscapeTags::Backticks => args.push("--escape-tags".into()),
-        EscapeTags::Entities => {
-            args.push("--escape-tags".into());
-            args.push("entities".into());
-        }
-    }
-    args
-}
+pub use table::options_to_cli_args;
 
 /// Parse a protoc-style option string and emit equivalent CLI argv tokens.
 pub fn parameter_to_cli_args(param: &str) -> Result<Vec<String>> {
     let opts = parse_parameter(&Some(param.to_string()))?;
     Ok(options_to_cli_args(&opts))
 }
-
-fn layout_name(layout: Layout) -> &'static str {
-    match layout {
-        Layout::Package => "package",
-        Layout::Entity => "entity",
-        Layout::Split => "split",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

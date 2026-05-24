@@ -117,7 +117,7 @@ fn main() -> Result<()> {
         Cmd::CheckHighlightjsVendor => vendor::check_highlightjs_vendor(),
         Cmd::BufLint => ci::buf_lint(),
         Cmd::BufFormat => ci::buf_format(),
-        Cmd::BufFormatCheck => ci::buf_format_check_cmd(),
+        Cmd::BufFormatCheck => ci::buf_format_check(),
         Cmd::CheckToolchain { strict } => ci::check_toolchain(strict),
         Cmd::Coverage {
             open,

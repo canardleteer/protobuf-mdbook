@@ -7,7 +7,7 @@ use std::process::Command;
 
 pub fn fmt() -> Result<()> {
     cargo_fmt(&[])?;
-    buf_format_write()
+    buf_format()
 }
 
 pub fn fmt_check() -> Result<()> {
@@ -117,7 +117,7 @@ pub fn buf_lint() -> Result<()> {
     }
 }
 
-fn buf_format_write() -> Result<()> {
+pub fn buf_format() -> Result<()> {
     buf_command()?;
     let proto_root = examples_proto();
     let status = Command::new("buf")
@@ -132,7 +132,7 @@ fn buf_format_write() -> Result<()> {
     }
 }
 
-fn buf_format_check() -> Result<()> {
+pub fn buf_format_check() -> Result<()> {
     buf_command()?;
     let proto_root = examples_proto();
     let status = Command::new("buf")
@@ -145,14 +145,6 @@ fn buf_format_check() -> Result<()> {
     } else {
         bail!("buf format --diff failed ({status}); run `cargo xtask fmt`");
     }
-}
-
-pub fn buf_format() -> Result<()> {
-    buf_format_write()
-}
-
-pub fn buf_format_check_cmd() -> Result<()> {
-    buf_format_check()
 }
 
 pub fn rumdl_check() -> Result<()> {

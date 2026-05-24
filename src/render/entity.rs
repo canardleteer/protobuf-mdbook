@@ -10,6 +10,15 @@ use crate::render::proto_syntax::{
 };
 use crate::render::source::SourceCache;
 use crate::render::{for_each_entity_in_files, md_heading, push_paragraph_break};
+use std::path::Path;
+
+fn render_ctx<'a>(links: &'a LinkContext, from_md: &'a Path, opts: &Options) -> RenderContext<'a> {
+    RenderContext {
+        links: Some(links),
+        from_md,
+        escape_tags: opts.escape_tags,
+    }
+}
 
 /// Render package index plus one page per message, enum, and service (both entity layouts).
 pub fn render_entity_pages(
@@ -48,11 +57,7 @@ pub fn render_entity_pages(
                 .entity_path(package, EntityKind::Message, name)
                 .expect("entity");
             let path = opts.output_path(rel.to_str().unwrap_or_default());
-            let ctx = RenderContext {
-                links: Some(links),
-                from_md: rel.as_path(),
-                escape_tags: opts.escape_tags,
-            };
+            let ctx = render_ctx(links, rel.as_path(), opts);
             let mut page = md_heading(1, name);
             page.push_str(&synthesize_message_with_file(
                 proto_name,
@@ -70,11 +75,7 @@ pub fn render_entity_pages(
                 .entity_path(package, EntityKind::Enum, name)
                 .expect("entity");
             let path = opts.output_path(rel.to_str().unwrap_or_default());
-            let ctx = RenderContext {
-                links: Some(links),
-                from_md: rel.as_path(),
-                escape_tags: opts.escape_tags,
-            };
+            let ctx = render_ctx(links, rel.as_path(), opts);
             let mut page = md_heading(1, name);
             page.push_str(&synthesize_enum(proto_name, &idx, i, en, Some(&ctx)));
             pages.push((path, page));
@@ -85,11 +86,7 @@ pub fn render_entity_pages(
                 .entity_path(package, EntityKind::Service, name)
                 .expect("entity");
             let path = opts.output_path(rel.to_str().unwrap_or_default());
-            let ctx = RenderContext {
-                links: Some(links),
-                from_md: rel.as_path(),
-                escape_tags: opts.escape_tags,
-            };
+            let ctx = render_ctx(links, rel.as_path(), opts);
             let page = synthesize_service(proto_name, &idx, i, svc, 1, Some(&ctx));
             pages.push((path, page));
         }
