@@ -18,10 +18,8 @@ pub struct NavInput<'a> {
 
 pub struct PackageAtDir<'a> {
     pub rel_dir: PathBuf,
-    #[allow(dead_code)]
     pub package: &'a str,
-    #[allow(dead_code)]
-    pub files: &'a [&'a FileDescriptorProto],
+    pub files: &'a [(&'a str, &'a FileDescriptorProto)],
 }
 
 #[derive(Default)]
@@ -39,14 +37,17 @@ struct LinkEntry {
     /// Protobuf-style path (`acme.example.v1`) for companions; package name for generated pages.
     module_path: Option<String>,
     is_package: bool,
+    entity_items: Vec<SummaryItem>,
 }
 
+/// Build companion + package nav tree; entity sub-links attach at package link creation when requested.
 pub fn build_summary(
     h1_title: &str,
     input: NavInput<'_>,
     layout: Layout,
-    _package_only: bool,
+    package_only: bool,
 ) -> Summary {
+    let attach_entities = !package_only && !matches!(layout, Layout::Package);
     let mut root = DirNode::default();
     for doc in input.companions {
         let target = PathBuf::from(&input.links.markdown_root).join(&doc.output_rel);
@@ -60,22 +61,29 @@ pub fn build_summary(
                 stem: doc.stem.clone(),
                 module_path: module_path_from_companion_output(&doc.output_rel, &doc.stem),
                 is_package: false,
+                entity_items: Vec::new(),
             },
             InsertKind::Companion,
         );
     }
-    for (pkg, info) in &input.packages {
-        let target = package_target(input.links, layout, pkg);
+    for info in input.packages.values() {
+        let target = package_target(input.links, layout, info.package);
         let path = link_path_for_summary(input.summary_from, &target);
+        let entity_items = if attach_entities {
+            super::entity_summary_items(info.package, info.files, input.links, input.summary_from)
+        } else {
+            Vec::new()
+        };
         insert_at(
             &mut root,
             path_segments(&info.rel_dir),
             LinkEntry {
-                title: pkg.to_string(),
+                title: info.package.to_string(),
                 path,
                 stem: String::new(),
-                module_path: Some(pkg.clone()),
+                module_path: Some(info.package.to_string()),
                 is_package: true,
+                entity_items,
             },
             InsertKind::Package,
         );
@@ -95,6 +103,7 @@ enum InsertKind {
     Package,
 }
 
+/// Normal path components for companion/package directory keys.
 fn path_segments(rel_dir: &Path) -> Vec<String> {
     rel_dir
         .components()
@@ -165,19 +174,18 @@ fn emit_dir(node: &DirNode, depth: usize) -> Vec<SummaryItem> {
     group.extend(node.packages.clone());
 
     if group.len() == 1 {
-        out.push(link_item(&summary_link_entry(&group[0], false), depth));
+        out.push(link_item(&summary_link_entry(&group[0], false)));
     } else if !group.is_empty() {
         let first = &group[0];
-        let mut link = Link::new(
-            summary_link_entry(first, false).title,
-            summary_link_entry(first, false).path,
-        );
-        for entry in &group[1..] {
-            let e = summary_link_entry(entry, true);
-            link.nested_items
-                .push(SummaryItem::Link(Link::new(e.title, e.path)));
+        let mut link = link_item(&summary_link_entry(first, false));
+        if let SummaryItem::Link(ref mut parent) = link {
+            for entry in &group[1..] {
+                parent
+                    .nested_items
+                    .push(link_item(&summary_link_entry(entry, true)));
+            }
         }
-        out.push(SummaryItem::Link(link));
+        out.push(link);
     }
 
     let child_depth = depth.saturating_add(1);
@@ -191,13 +199,13 @@ fn emit_dir(node: &DirNode, depth: usize) -> Vec<SummaryItem> {
 fn emit_flat(node: &DirNode) -> Vec<SummaryItem> {
     let mut items = Vec::new();
     for c in &node.companions {
-        items.push(link_item(&summary_link_entry(c, false), 0));
+        items.push(link_item(&summary_link_entry(c, false)));
     }
     for child in node.children.values() {
         items.extend(emit_flat(child));
     }
     for p in &node.packages {
-        items.push(link_item(&summary_link_entry(p, false), 0));
+        items.push(link_item(&summary_link_entry(p, false)));
     }
     items
 }
@@ -209,6 +217,7 @@ fn summary_link_entry(entry: &LinkEntry, is_nested: bool) -> LinkEntry {
         stem: entry.stem.clone(),
         module_path: entry.module_path.clone(),
         is_package: entry.is_package,
+        entity_items: entry.entity_items.clone(),
     }
 }
 
@@ -247,11 +256,14 @@ fn companion_stem_rank(stem: &str) -> u8 {
     }
 }
 
-fn link_item(entry: &LinkEntry, depth: usize) -> SummaryItem {
-    let _ = depth;
-    SummaryItem::Link(Link::new(entry.title.clone(), &entry.path))
+/// Emit one SUMMARY link, including entity sub-links on package entries.
+fn link_item(entry: &LinkEntry) -> SummaryItem {
+    let mut link = Link::new(entry.title.clone(), &entry.path);
+    link.nested_items = entry.entity_items.clone();
+    SummaryItem::Link(link)
 }
 
+/// Parent directory of a proto file, used for nav-tree placement.
 pub fn package_rel_dir(proto_name: &str) -> PathBuf {
     Path::new(proto_name)
         .parent()
@@ -275,6 +287,7 @@ mod tests {
             stem: "README".into(),
             module_path: Some(module_path.into()),
             is_package: false,
+            entity_items: Vec::new(),
         };
         let package = |pkg: &str| LinkEntry {
             title: pkg.into(),
@@ -282,6 +295,7 @@ mod tests {
             stem: String::new(),
             module_path: Some(pkg.into()),
             is_package: true,
+            entity_items: Vec::new(),
         };
 
         assert_eq!(
@@ -317,6 +331,7 @@ mod tests {
             title: "Notes".into(),
             source_dir: PathBuf::from("a/b"),
             stem: "NOTES".into(),
+            source_path: PathBuf::from("/unused"),
         }];
         // `a.b` has a dot → section companion is prefixed in SUMMARY.
         let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
@@ -346,14 +361,13 @@ mod tests {
         );
         let opts = Options::default();
         let links = build_link_context(&by_package, &opts);
-        let empty: &[&FileDescriptorProto] = &[];
         let packages = BTreeMap::from([
             (
                 "shallow.v2".into(),
                 PackageAtDir {
                     rel_dir: package_rel_dir("a/b/c/d/v2/e.proto"),
                     package: "shallow.v2",
-                    files: empty,
+                    files: by_package["shallow.v2"].as_slice(),
                 },
             ),
             (
@@ -361,7 +375,7 @@ mod tests {
                 PackageAtDir {
                     rel_dir: package_rel_dir("a/b/c/d/e/f/g/h/v1/stuff.proto"),
                     package: "deep.v1",
-                    files: empty,
+                    files: by_package["deep.v1"].as_slice(),
                 },
             ),
             (
@@ -369,7 +383,7 @@ mod tests {
                 PackageAtDir {
                     rel_dir: package_rel_dir("a/b/c/d/e/f/g/h/v2/stuff.proto"),
                     package: "deep.v2",
-                    files: empty,
+                    files: by_package["deep.v2"].as_slice(),
                 },
             ),
         ]);

@@ -30,7 +30,6 @@ pub struct Options {
     pub(crate) explicit_markdown_root: bool,
     pub(crate) explicit_summary_path: bool,
     pub title: Option<String>,
-    pub theme: bool,
     pub ignore_git: bool,
     pub layout: Layout,
     /// Extra directories to resolve `FileDescriptorProto.name` when reading source for spans.
@@ -54,7 +53,6 @@ impl Default for Options {
             explicit_markdown_root: false,
             explicit_summary_path: false,
             title: None,
-            theme: false,
             ignore_git: true,
             layout: Layout::Package,
             proto_search_path: Vec::new(),
@@ -107,57 +105,83 @@ pub fn parse_parameter(parameter: &Option<String>) -> Result<Options> {
         return Ok(opts);
     };
 
-    for opt in param.split(',').map(str::trim).filter(|s| !s.is_empty()) {
-        if let Some(v) = opt.strip_prefix("book_root=") {
-            opts.book_root = normalize_book_root(v);
-            opts.explicit_book_root = true;
-        } else if let Some(v) = opt.strip_prefix("markdown_root=") {
-            opts.markdown_root = normalize_rel_path(v, default_markdown_root())?;
-            opts.explicit_markdown_root = true;
-        } else if let Some(v) = opt.strip_prefix("summary_path=") {
-            opts.summary_path = normalize_rel_path(v, default_summary_path())?;
-            opts.explicit_summary_path = true;
-        } else if let Some(v) = opt.strip_prefix("book=") {
-            opts.book = Some(v.to_string());
-        } else if let Some(v) = opt.strip_prefix("mdbook_out=") {
-            opts.mdbook_out = Some(v.to_string());
-        } else if let Some(v) = opt.strip_prefix("title=") {
-            opts.title = Some(v.to_string());
-        } else if let Some(v) = opt.strip_prefix("ignore=") {
-            opts.ignore_git = match v {
-                "git" => true,
-                "none" => false,
-                other => bail!("unknown ignore value {other:?}; use git or none"),
-            };
-        } else if let Some(v) = opt.strip_prefix("proto_path=") {
-            opts.proto_search_path = v
-                .split(':')
-                .filter(|s| !s.is_empty())
-                .map(PathBuf::from)
-                .collect();
-        } else if let Some(v) = opt.strip_prefix("layout=") {
-            opts.layout = match v {
-                "package" => Layout::Package,
-                "entity" => Layout::Entity,
-                "split" => Layout::Split,
-                other => bail!("unknown layout {other:?}; use package, entity, or split"),
-            };
-        } else {
-            match opt {
-                "init" => opts.init = true,
-                "summary" => opts.summary = true,
-                "theme" => opts.theme = true,
-                "no_proto_highlight" => opts.no_proto_highlight = true,
-                "no_cel_highlight" => opts.no_cel_highlight = true,
-                "no_proto_markdown" => opts.no_proto_markdown = true,
-                "markdown_only" => {
-                    saw_markdown_only = true;
-                }
-                other => bail!("unknown plugin option: {other:?}"),
-            }
-        }
+    for token in param.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+        apply_option_token(&mut opts, token, &mut saw_markdown_only)?;
     }
 
+    validate_options(&opts, saw_markdown_only)?;
+    Ok(opts)
+}
+
+/// Apply one comma-separated plugin option token.
+fn apply_option_token(opts: &mut Options, token: &str, saw_markdown_only: &mut bool) -> Result<()> {
+    if let Some(v) = token.strip_prefix("book_root=") {
+        opts.book_root = normalize_book_root(v);
+        opts.explicit_book_root = true;
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("markdown_root=") {
+        opts.markdown_root = normalize_rel_path(v, default_markdown_root())?;
+        opts.explicit_markdown_root = true;
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("summary_path=") {
+        opts.summary_path = normalize_rel_path(v, default_summary_path())?;
+        opts.explicit_summary_path = true;
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("book=") {
+        opts.book = Some(v.to_string());
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("mdbook_out=") {
+        opts.mdbook_out = Some(v.to_string());
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("title=") {
+        opts.title = Some(v.to_string());
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("ignore=") {
+        opts.ignore_git = match v {
+            "git" => true,
+            "none" => false,
+            other => bail!("unknown ignore value {other:?}; use git or none"),
+        };
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("proto_path=") {
+        opts.proto_search_path = v
+            .split(':')
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from)
+            .collect();
+        return Ok(());
+    }
+    if let Some(v) = token.strip_prefix("layout=") {
+        opts.layout = match v {
+            "package" => Layout::Package,
+            "entity" => Layout::Entity,
+            "split" => Layout::Split,
+            other => bail!("unknown layout {other:?}; use package, entity, or split"),
+        };
+        return Ok(());
+    }
+
+    match token {
+        "init" => opts.init = true,
+        "summary" => opts.summary = true,
+        "no_proto_highlight" => opts.no_proto_highlight = true,
+        "no_cel_highlight" => opts.no_cel_highlight = true,
+        "no_proto_markdown" => opts.no_proto_markdown = true,
+        "markdown_only" => *saw_markdown_only = true,
+        other => bail!("unknown plugin option: {other:?}"),
+    }
+    Ok(())
+}
+
+/// Init-only and deprecated-option checks after all tokens are applied.
+fn validate_options(opts: &Options, saw_markdown_only: bool) -> Result<()> {
     if saw_markdown_only {
         eprintln!(
             "protobuf-mdbook: `markdown_only` is deprecated (default output is markdown-only); use `init` for a full mdBook project"
@@ -176,15 +200,12 @@ pub fn parse_parameter(parameter: &Option<String>) -> Result<Options> {
         if opts.title.is_some() {
             bail!("`title` is only valid with `init`");
         }
-        if opts.theme {
-            bail!("`theme` is only valid with `init`");
-        }
         if !opts.ignore_git {
             bail!("`ignore=none` is only valid with `init`");
         }
     }
 
-    Ok(opts)
+    Ok(())
 }
 
 fn normalize_book_root(root: &str) -> String {

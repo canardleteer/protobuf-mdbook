@@ -146,7 +146,7 @@ pub fn merge_init_files(
         .filter_map(|(k, v)| {
             String::from_utf8(v)
                 .ok()
-                .map(|s| (prefix_book_root(book_root, &k), s))
+                .map(|s| (join_book_root(book_root, &k), s))
         })
         .collect();
 
@@ -213,10 +213,6 @@ fn append_book_toml_highlight_comment(
             out.insert(book_key, comment.trim_start().to_string());
         }
     }
-}
-
-fn prefix_book_root(book_root: &str, rel: &str) -> String {
-    join_book_root(book_root, rel)
 }
 
 /// Starter README beside `book.toml` (init mode only).

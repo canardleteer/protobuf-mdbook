@@ -190,6 +190,11 @@ fn unique_id(id: &str, used: &mut HashSet<String>) -> String {
 }
 
 fn relative_path(from_dir: &Path, target: &Path) -> String {
+    relative_path_from_dir(from_dir, target)
+}
+
+/// Relative POSIX path from `from_dir` to `target` (mdBook link form).
+pub fn relative_path_from_dir(from_dir: &Path, target: &Path) -> String {
     let from_parts: Vec<_> = from_dir.components().collect();
     let target_parts: Vec<_> = target.components().collect();
     let mut i = 0;
@@ -234,6 +239,46 @@ mod tests {
         ];
         for (input, expected) in cases {
             assert_eq!(id_from_content(input), expected, "input: {input:?}");
+        }
+    }
+
+    #[test]
+    fn relative_path_from_dir_cases() {
+        use std::path::PathBuf;
+
+        let cases = [
+            (
+                Path::new("src"),
+                Path::new("src/packages/acme.md"),
+                "packages/acme.md",
+            ),
+            (
+                Path::new("src/packages"),
+                Path::new("src/packages/acme.md"),
+                "acme.md",
+            ),
+            (
+                Path::new("content/api"),
+                Path::new("src/packages/acme.md"),
+                "../../src/packages/acme.md",
+            ),
+        ];
+        for (from, target, expected) in cases {
+            assert_eq!(
+                relative_path_from_dir(from, target),
+                expected,
+                "from={from:?} target={target:?}"
+            );
+            let summary_from = PathBuf::from("src/SUMMARY.md");
+            let from_dir = summary_from.parent().unwrap();
+            if from == from_dir {
+                let via_summary = PathBuf::from(relative_path_from_dir(from_dir, target));
+                assert_eq!(
+                    via_summary.to_string_lossy(),
+                    expected,
+                    "link_path_for_summary parity"
+                );
+            }
         }
     }
 }

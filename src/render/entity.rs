@@ -8,14 +8,14 @@ use crate::render::proto_syntax::{
     RenderContext, synthesize_enum, synthesize_message_with_file, synthesize_service,
 };
 use crate::render::source::SourceCache;
-use crate::render::{md_heading, push_paragraph_break};
+use crate::render::{for_each_entity_in_files, md_heading, push_paragraph_break};
 
+/// Render package index plus one page per message, enum, and service (both entity layouts).
 pub fn render_entity_pages(
     package: &str,
     files: &[(&str, &FileDescriptorProto)],
     links: &LinkContext,
     opts: &Options,
-    layout_split: bool,
     source: &mut SourceCache,
 ) -> Vec<(String, String)> {
     let mut pages = Vec::new();
@@ -30,42 +30,16 @@ pub fn render_entity_pages(
         }
         index.push_str(&md_heading(2, "Contents"));
         let index_from = index_rel.as_path();
-        for (fname, file) in files {
-            for msg in &file.message_type {
-                let name = msg.name.as_deref().unwrap_or("Message");
-                let p = links
-                    .entity_path(package, EntityKind::Message, name)
-                    .expect("entity");
-                index.push_str("- ");
-                index.push_str(&links.summary_link(index_from, p, name));
-                index.push('\n');
-                let _ = fname;
-            }
-            for en in &file.enum_type {
-                let name = en.name.as_deref().unwrap_or("Enum");
-                let p = links
-                    .entity_path(package, EntityKind::Enum, name)
-                    .expect("entity");
-                index.push_str("- ");
-                index.push_str(&links.summary_link(index_from, p, name));
-                index.push('\n');
-            }
-            for svc in &file.service {
-                let name = svc.name.as_deref().unwrap_or("Service");
-                let p = links
-                    .entity_path(package, EntityKind::Service, name)
-                    .expect("entity");
-                index.push_str("- ");
-                index.push_str(&links.summary_link(index_from, p, name));
-                index.push('\n');
-            }
-        }
+        for_each_entity_in_files(files, |kind, name, _, _, _| {
+            let p = links.entity_path(package, kind, name).expect("entity");
+            index.push_str("- ");
+            index.push_str(&links.summary_link(index_from, p, name));
+            index.push('\n');
+        });
         pages.push((index_path, index));
     }
 
-    let _ = layout_split;
-
-    for (fname, file) in files {
+    for (proto_name, file) in files {
         let idx = CommentIndex::from_file(file);
         for (i, msg) in file.message_type.iter().enumerate() {
             let name = msg.name.as_deref().unwrap_or("Message");
@@ -75,7 +49,7 @@ pub fn render_entity_pages(
             let path = opts.output_path(rel.to_str().unwrap_or_default());
             let mut page = md_heading(1, name);
             page.push_str(&synthesize_message_with_file(
-                fname,
+                proto_name,
                 &idx,
                 i,
                 msg,
@@ -90,7 +64,7 @@ pub fn render_entity_pages(
                 .expect("entity");
             let path = opts.output_path(rel.to_str().unwrap_or_default());
             let mut page = md_heading(1, name);
-            page.push_str(&synthesize_enum(fname, &idx, i, en));
+            page.push_str(&synthesize_enum(proto_name, &idx, i, en));
             pages.push((path, page));
         }
         for (i, svc) in file.service.iter().enumerate() {
@@ -103,7 +77,7 @@ pub fn render_entity_pages(
                 links: Some(links),
                 from_md: rel.as_path(),
             };
-            let page = synthesize_service(fname, &idx, i, svc, 1, Some(&ctx));
+            let page = synthesize_service(proto_name, &idx, i, svc, 1, Some(&ctx));
             pages.push((path, page));
         }
     }

@@ -7,16 +7,16 @@ use crate::init::DEFAULT_BOOK_TITLE;
 use crate::options::{Layout, Options};
 use crate::plugin_api::FileDescriptorProto;
 use crate::proto_markdown::CompanionDoc;
+use crate::render::for_each_entity_in_files;
 use crate::render::links::{EntityKind, LinkContext};
 use nav_tree::{NavInput, PackageAtDir, build_summary, package_rel_dir};
 use render_md::{render_summary_markdown, validate_summary_warn};
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Build SUMMARY navigation when `summary` or `init` is set.
 pub fn render_summary(
-    proto_files: &[FileDescriptorProto],
-    file_to_generate: &[String],
+    by_package: &BTreeMap<String, Vec<(&str, &FileDescriptorProto)>>,
     opts: &Options,
     links: &LinkContext,
     companions: &[CompanionDoc],
@@ -24,73 +24,41 @@ pub fn render_summary(
     if !opts.render_summary() {
         return None;
     }
-    if opts.no_proto_markdown {
-        return render_summary_proto_only(proto_files, file_to_generate, opts, links);
-    }
 
     let package_only = opts.package_only_summary();
     let h1 = summary_h1_title(opts);
-
-    let mut by_package: BTreeMap<String, Vec<&FileDescriptorProto>> = BTreeMap::new();
-    let mut package_dirs: BTreeMap<String, PathBuf> = BTreeMap::new();
-    for name in file_to_generate {
-        let Some(file) = proto_files
-            .iter()
-            .find(|f| f.name.as_deref() == Some(name.as_str()))
-        else {
-            continue;
-        };
-        let pkg = file.package.clone().unwrap_or_default();
-        if pkg.is_empty() {
-            continue;
-        }
-        by_package.entry(pkg.clone()).or_default().push(file);
-        package_dirs
-            .entry(pkg)
-            .or_insert_with(|| package_rel_dir(name));
-    }
-
-    let mut packages = BTreeMap::new();
-    for (package, files) in &by_package {
-        let rel_dir = package_dirs.get(package).cloned().unwrap_or_default();
-        packages.insert(
-            package.clone(),
-            PackageAtDir {
-                rel_dir,
-                package,
-                files,
-            },
-        );
-    }
-
     let summary_from = Path::new(&opts.summary_path);
-    let mut summary = build_summary(
-        &h1,
-        NavInput {
-            companions,
-            packages,
-            summary_from,
-            links,
-        },
-        opts.layout,
-        package_only,
-    );
 
-    if !package_only {
-        append_entity_lines(
-            &mut summary.numbered_chapters,
-            &by_package,
+    let summary = if opts.no_proto_markdown {
+        build_flat_summary(
+            by_package,
+            &h1,
             opts.layout,
+            package_only,
             links,
             summary_from,
-        );
-    }
+        )
+    } else {
+        let packages = packages_nav_input(by_package);
+        build_summary(
+            &h1,
+            NavInput {
+                companions,
+                packages,
+                summary_from,
+                links,
+            },
+            opts.layout,
+            package_only,
+        )
+    };
 
     let md = render_summary_markdown(&summary);
     validate_summary_warn(&md);
     Some((opts.output_path(&opts.summary_path), md))
 }
 
+/// H1 title for generated SUMMARY.md.
 fn summary_h1_title(opts: &Options) -> String {
     if opts.init {
         opts.title
@@ -101,37 +69,59 @@ fn summary_h1_title(opts: &Options) -> String {
     }
 }
 
-fn render_summary_proto_only(
-    proto_files: &[FileDescriptorProto],
-    file_to_generate: &[String],
-    opts: &Options,
-    links: &LinkContext,
-) -> Option<(String, String)> {
-    if !opts.render_summary() {
-        return None;
-    }
-
-    let package_only = opts.package_only_summary();
-    let h1 = summary_h1_title(opts);
-
-    let mut by_package: BTreeMap<String, Vec<&FileDescriptorProto>> = BTreeMap::new();
-    for name in file_to_generate {
-        let Some(file) = proto_files
-            .iter()
-            .find(|f| f.name.as_deref() == Some(name.as_str()))
-        else {
+/// Map packages to filesystem-relative dirs for nav-tree insertion (first proto path wins per package).
+fn packages_nav_input<'a>(
+    by_package: &'a BTreeMap<String, Vec<(&'a str, &'a FileDescriptorProto)>>,
+) -> BTreeMap<String, PackageAtDir<'a>> {
+    let mut out = BTreeMap::new();
+    for (package, files) in by_package {
+        if package.is_empty() {
             continue;
-        };
-        let pkg = file.package.clone().unwrap_or_default();
-        if !pkg.is_empty() {
-            by_package.entry(pkg).or_default().push(file);
         }
+        let rel_dir = files
+            .first()
+            .map(|(name, _)| package_rel_dir(name))
+            .unwrap_or_default();
+        out.insert(
+            package.clone(),
+            PackageAtDir {
+                rel_dir,
+                package,
+                files,
+            },
+        );
     }
+    out
+}
 
-    let summary_from = Path::new(&opts.summary_path);
+/// Flat SUMMARY chapters when companion markdown is disabled (`no_proto_markdown`).
+fn build_flat_summary(
+    by_package: &BTreeMap<String, Vec<(&str, &FileDescriptorProto)>>,
+    h1: &str,
+    layout: Layout,
+    package_only: bool,
+    links: &LinkContext,
+    summary_from: &Path,
+) -> mdbook_summary::Summary {
+    let chapters =
+        build_flat_summary_chapters(by_package, layout, package_only, links, summary_from);
+    let mut summary = mdbook_summary::Summary::default();
+    summary.title = Some(h1.to_string());
+    summary.numbered_chapters = chapters;
+    summary
+}
+
+/// One top-level chapter per package for flat SUMMARY layouts.
+fn build_flat_summary_chapters(
+    by_package: &BTreeMap<String, Vec<(&str, &FileDescriptorProto)>>,
+    layout: Layout,
+    package_only: bool,
+    links: &LinkContext,
+    summary_from: &Path,
+) -> Vec<mdbook_summary::SummaryItem> {
     let mut chapters = Vec::new();
-    for (package, files) in &by_package {
-        match opts.layout {
+    for (package, files) in by_package {
+        match layout {
             Layout::Package => {
                 let target = links.package_page_rel(package);
                 let path = render_md::link_path_for_summary(summary_from, &target);
@@ -150,94 +140,42 @@ fn render_summary_proto_only(
                 let target = links.package_index_rel(package);
                 let path = render_md::link_path_for_summary(summary_from, &target);
                 let mut link = mdbook_summary::Link::new(package, path);
-                push_entity_items(&mut link.nested_items, package, files, links, summary_from);
+                link.nested_items = entity_summary_items(package, files, links, summary_from);
                 chapters.push(mdbook_summary::SummaryItem::Link(link));
             }
             Layout::Entity => {
                 let mut link = mdbook_summary::Link::default();
                 link.name = package.to_string();
                 link.location = None;
-                push_entity_items(&mut link.nested_items, package, files, links, summary_from);
+                link.nested_items = entity_summary_items(package, files, links, summary_from);
                 chapters.push(mdbook_summary::SummaryItem::Link(link));
             }
         }
     }
-
-    let mut summary = mdbook_summary::Summary::default();
-    summary.title = Some(h1);
-    summary.numbered_chapters = chapters;
-    let md = render_summary_markdown(&summary);
-    validate_summary_warn(&md);
-    Some((opts.output_path(&opts.summary_path), md))
+    chapters
 }
 
-fn append_entity_lines(
-    chapters: &mut [mdbook_summary::SummaryItem],
-    by_package: &BTreeMap<String, Vec<&FileDescriptorProto>>,
-    layout: Layout,
-    links: &LinkContext,
-    summary_from: &Path,
-) {
-    if matches!(layout, Layout::Package) {
-        return;
-    }
-    for (package, files) in by_package {
-        let target = links.package_index_rel(package);
-        let path = render_md::link_path_for_summary(summary_from, &target);
-        if let Some(mdbook_summary::SummaryItem::Link(link)) = chapters.iter_mut().find(|item| {
-            if let mdbook_summary::SummaryItem::Link(l) = item {
-                l.location.as_deref() == Some(path.as_path())
-            } else {
-                false
-            }
-        }) {
-            push_entity_items(&mut link.nested_items, package, files, links, summary_from);
-        }
-    }
-}
-
-fn push_entity_items(
-    out: &mut Vec<mdbook_summary::SummaryItem>,
+/// Entity sub-links for SUMMARY in link/SUMMARY order.
+pub(crate) fn entity_summary_items(
     package: &str,
-    files: &[&FileDescriptorProto],
+    files: &[(&str, &FileDescriptorProto)],
     links: &LinkContext,
     summary_from: &Path,
-) {
-    for file in files {
-        for msg in &file.message_type {
-            if let Some(name) = &msg.name {
-                let p = links
-                    .entity_path(package, EntityKind::Message, name)
-                    .expect("entity");
-                let path = render_md::link_path_for_summary(summary_from, p);
-                out.push(mdbook_summary::SummaryItem::Link(
-                    mdbook_summary::Link::new(format!("Message {name}"), path),
-                ));
-            }
-        }
-        for en in &file.enum_type {
-            if let Some(name) = &en.name {
-                let p = links
-                    .entity_path(package, EntityKind::Enum, name)
-                    .expect("entity");
-                let path = render_md::link_path_for_summary(summary_from, p);
-                out.push(mdbook_summary::SummaryItem::Link(
-                    mdbook_summary::Link::new(format!("Enum {name}"), path),
-                ));
-            }
-        }
-        for svc in &file.service {
-            if let Some(name) = &svc.name {
-                let p = links
-                    .entity_path(package, EntityKind::Service, name)
-                    .expect("entity");
-                let path = render_md::link_path_for_summary(summary_from, p);
-                out.push(mdbook_summary::SummaryItem::Link(
-                    mdbook_summary::Link::new(format!("Service {name}"), path),
-                ));
-            }
-        }
-    }
+) -> Vec<mdbook_summary::SummaryItem> {
+    let mut out = Vec::new();
+    for_each_entity_in_files(files, |kind, name, _, _, _| {
+        let p = links.entity_path(package, kind, name).expect("entity");
+        let path = render_md::link_path_for_summary(summary_from, p);
+        let title = match kind {
+            EntityKind::Message => format!("Message {name}"),
+            EntityKind::Enum => format!("Enum {name}"),
+            EntityKind::Service => format!("Service {name}"),
+        };
+        out.push(mdbook_summary::SummaryItem::Link(
+            mdbook_summary::Link::new(title, path),
+        ));
+    });
+    out
 }
 
 #[cfg(test)]
@@ -256,6 +194,7 @@ mod tests {
             title: title.to_string(),
             source_dir,
             stem: stem.to_string(),
+            source_path: PathBuf::from("/unused"),
         }
     }
 
@@ -279,15 +218,7 @@ mod tests {
             ..Options::default()
         };
         let links = build_link_context(&by_package, &opts);
-        let empty: &[&FileDescriptorProto] = &[];
-        let packages = BTreeMap::from([(
-            "acme.example.v1".to_string(),
-            PackageAtDir {
-                rel_dir: PathBuf::from("acme/example/v1"),
-                package: "acme.example.v1",
-                files: empty,
-            },
-        )]);
+        let packages = packages_nav_input(&by_package);
         let summary = build_summary(
             "Protobuf documentation",
             NavInput {
@@ -313,22 +244,19 @@ mod tests {
     #[test]
     fn render_summary_entity_layout_lists_entities() {
         let file = rich_file("acme.example.v1");
-        let proto_files = vec![file.clone()];
-        let file_to_generate = vec!["acme/example/v1/a.proto".into()];
+        let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
+        by_package.insert(
+            "acme.example.v1".into(),
+            vec![("acme/example/v1/a.proto", &file)],
+        );
         let opts = Options {
             summary: true,
             layout: Layout::Entity,
             no_proto_markdown: true,
             ..Options::default()
         };
-        let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
-        by_package.insert(
-            "acme.example.v1".into(),
-            vec![("acme/example/v1/a.proto", &file)],
-        );
         let links = build_link_context(&by_package, &opts);
-        let out =
-            render_summary(&proto_files, &file_to_generate, &opts, &links, &[]).expect("summary");
+        let out = render_summary(&by_package, &opts, &links, &[]).expect("summary");
         let md = out.1;
         mdbook_summary::parse_summary(&md).expect("valid SUMMARY");
         assert!(md.contains("Message EchoUnaryRequest"));
@@ -338,22 +266,19 @@ mod tests {
     #[test]
     fn render_summary_split_layout_nests_entities() {
         let file = rich_file("acme.example.v1");
-        let proto_files = vec![file.clone()];
-        let file_to_generate = vec!["acme/example/v1/a.proto".into()];
+        let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
+        by_package.insert(
+            "acme.example.v1".into(),
+            vec![("acme/example/v1/a.proto", &file)],
+        );
         let opts = Options {
             summary: true,
             layout: Layout::Split,
             no_proto_markdown: true,
             ..Options::default()
         };
-        let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
-        by_package.insert(
-            "acme.example.v1".into(),
-            vec![("acme/example/v1/a.proto", &file)],
-        );
         let links = build_link_context(&by_package, &opts);
-        let out =
-            render_summary(&proto_files, &file_to_generate, &opts, &links, &[]).expect("summary");
+        let out = render_summary(&by_package, &opts, &links, &[]).expect("summary");
         let md = out.1;
         mdbook_summary::parse_summary(&md).expect("valid SUMMARY");
         assert!(md.contains("[acme.example.v1]"));
@@ -364,20 +289,17 @@ mod tests {
     fn render_summary_with_companions_uses_nav_tree() {
         let companions = vec![companion("acme/example/v1", "README", "v1 README")];
         let file = dummy_file("acme.example.v1");
-        let proto_files = vec![file.clone()];
-        let file_to_generate = vec!["acme/example/v1/a.proto".into()];
-        let opts = Options {
-            summary: true,
-            ..Options::default()
-        };
         let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
         by_package.insert(
             "acme.example.v1".into(),
             vec![("acme/example/v1/a.proto", &file)],
         );
+        let opts = Options {
+            summary: true,
+            ..Options::default()
+        };
         let links = build_link_context(&by_package, &opts);
-        let out = render_summary(&proto_files, &file_to_generate, &opts, &links, &companions)
-            .expect("summary");
+        let out = render_summary(&by_package, &opts, &links, &companions).expect("summary");
         let md = out.1;
         mdbook_summary::parse_summary(&md).expect("valid SUMMARY");
         assert!(md.contains("[acme.example.v1 - v1 README]"));
