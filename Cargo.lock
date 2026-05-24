@@ -802,6 +802,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "protobuf-mdbook"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "buffa",
+ "buffa-descriptor",
+ "clap",
+ "mdbook-core",
+ "mdbook-driver",
+ "mdbook-summary",
+ "protoc-bin-vendored",
+ "tempfile",
+ "walkdir",
+]
+
+[[package]]
+name = "protobuf-mdbook-xtask"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "protobuf-mdbook",
+ "protoc-bin-vendored",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+]
+
+[[package]]
 name = "protoc-bin-vendored"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -864,34 +893,6 @@ name = "protoc-bin-vendored-win32"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95067976aca6421a523e491fce939a3e65249bac4b977adee0ee9771568e8aa3"
-
-[[package]]
-name = "protoc-gen-mdbook"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "buffa",
- "buffa-descriptor",
- "mdbook-core",
- "mdbook-driver",
- "mdbook-summary",
- "protoc-bin-vendored",
- "tempfile",
- "walkdir",
-]
-
-[[package]]
-name = "protoc-gen-mdbook-xtask"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "protoc-bin-vendored",
- "protoc-gen-mdbook",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
-]
 
 [[package]]
 name = "pulldown-cmark"

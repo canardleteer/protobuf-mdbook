@@ -1,6 +1,6 @@
 # Example protos (`examples/proto`)
 
-Test fixtures for **protoc-gen-mdbook**. The book under `./api-book/` (and the
+Test fixtures for **protobuf-mdbook**. The book under `./api-book/` (and the
 GitHub Pages site published from `main`) is generated from these `.proto` files
 and companion markdown — not a real product API.
 

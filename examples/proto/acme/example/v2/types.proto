@@ -1,7 +1,7 @@
 // acme.example.v2 — shared vocabulary for documentation generation fixtures.
 //
 // Lorem ipsum dolor sit amet, consectetur adipiscing elit. This package intentionally
-// accumulates **many** messages and enums so `protoc-gen-mdbook` can exercise package
+// accumulates **many** messages and enums so `protobuf-mdbook` can exercise package
 // rollup, cross-links from `acme.example.v1`, and long comment preservation.
 //
 // | Concern | Primary types |

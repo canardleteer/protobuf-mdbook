@@ -23,7 +23,7 @@ COPY assets ./assets
 COPY src ./src
 COPY xtask ./xtask
 RUN buf --version \
-  && cargo build --locked --release --target x86_64-unknown-linux-musl -p protoc-gen-mdbook
+  && cargo build --locked --release --target x86_64-unknown-linux-musl -p protobuf-mdbook
 
 FROM debian:bookworm-slim AS ids
 RUN echo 'nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin' > /passwd \

@@ -78,7 +78,7 @@ fn validate_mdbook_out(mdbook_out: &str, book_root: &Path) -> Result<()> {
         return Ok(());
     }
     eprintln!(
-        "protoc-gen-mdbook: warning: `mdbook_out={}` does not match book root `{}`; \
+        "protobuf-mdbook: warning: `mdbook_out={}` does not match book root `{}`; \
          point `--mdbook_out` at the book root or omit `book=`",
         out.display(),
         book_root.display()

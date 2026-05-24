@@ -7,7 +7,7 @@
   "upstream_file_url": null,
   "upstream_sha256": null,
   "local_modifications": [
-    "authored for protoc-gen-mdbook; Protovalidate CEL surface",
+    "authored for protobuf-mdbook; Protovalidate CEL surface",
     "IIFE hljs.registerLanguage + registerAliases for mdBook theme load order"
   ]
 }

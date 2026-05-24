@@ -1,4 +1,4 @@
-//! `protoc-gen-mdbook` library — generate mdBook trees from protobuf descriptors.
+//! `protobuf-mdbook` library — generate mdBook trees from protobuf descriptors.
 
 #![forbid(unsafe_code)]
 
@@ -6,6 +6,7 @@ mod plugin_api;
 
 pub mod book_config;
 pub mod init;
+pub mod input;
 pub mod link_check;
 pub mod options;
 pub mod proto_deps;
@@ -13,37 +14,55 @@ pub mod proto_markdown;
 pub mod render;
 pub mod summary;
 
-use crate::plugin_api::{CodeGeneratorRequest, CodeGeneratorResponse, CodeGeneratorResponseFile};
-use anyhow::{Result, bail};
+use crate::plugin_api::{
+    CodeGeneratorRequest, CodeGeneratorResponse, CodeGeneratorResponseFile, FileDescriptorProto,
+};
+use anyhow::{Context, Result, bail};
 use buffa::Message;
 use options::parse_parameter;
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::book_config::apply_book_config;
+
+/// Inputs for documentation generation (plugin request or CLI-resolved descriptors).
+#[derive(Clone, Debug)]
+pub struct GenerateInput {
+    pub proto_file: Vec<FileDescriptorProto>,
+    pub file_to_generate: Vec<String>,
+    pub parameter: Option<String>,
+}
+
+impl From<CodeGeneratorRequest> for GenerateInput {
+    fn from(req: CodeGeneratorRequest) -> Self {
+        Self {
+            proto_file: req.proto_file,
+            file_to_generate: req.file_to_generate,
+            parameter: req.parameter,
+        }
+    }
+}
 
 /// mdBook version compiled into this plugin (`mdbook-core` pin in root `Cargo.toml`).
 pub fn mdbook_version() -> &'static str {
     mdbook_core::MDBOOK_VERSION
 }
 
-/// Decode request bytes, generate documentation, encode response.
-pub fn generate(request_bytes: &[u8]) -> Result<Vec<u8>> {
-    let req = CodeGeneratorRequest::decode_from_slice(request_bytes)
-        .map_err(|e| anyhow::anyhow!("decode CodeGeneratorRequest: {e}"))?;
-
-    if req.file_to_generate.is_empty() {
+/// Generate output files from descriptors and plugin options.
+pub fn generate_from_input(input: &GenerateInput) -> Result<Vec<(String, String)>> {
+    if input.file_to_generate.is_empty() {
         bail!("file_to_generate is empty");
     }
 
-    let mut opts = parse_parameter(&req.parameter)?;
+    let mut opts = parse_parameter(&input.parameter)?;
     apply_book_config(&mut opts)?;
 
-    let by_package = render::packages_map(&req.proto_file, &req.file_to_generate);
+    let by_package = render::packages_map(&input.proto_file, &input.file_to_generate);
     let links = render::build_link_context(&by_package, &opts);
     let mut source = render::source::SourceCache::new(opts.proto_search_paths());
     let docs = render::render_all(
-        &req.proto_file,
-        &req.file_to_generate,
+        &input.proto_file,
+        &input.file_to_generate,
         &opts,
         &links,
         &mut source,
@@ -55,14 +74,14 @@ pub fn generate(request_bytes: &[u8]) -> Result<Vec<u8>> {
     }
 
     let companions =
-        proto_markdown::discover_companion_docs(&req.proto_file, &req.file_to_generate, &opts)?;
+        proto_markdown::discover_companion_docs(&input.proto_file, &input.file_to_generate, &opts)?;
     for (path, content) in proto_markdown::read_companion_files(&companions, &opts)? {
         file_map.insert(path, content);
     }
 
     if let Some((path, content)) = summary::render_summary(
-        &req.proto_file,
-        &req.file_to_generate,
+        &input.proto_file,
+        &input.file_to_generate,
         &opts,
         &links,
         &companions,
@@ -80,9 +99,30 @@ pub fn generate(request_bytes: &[u8]) -> Result<Vec<u8>> {
         pairs
     };
 
-    let file_map: HashMap<String, String> = pairs.into_iter().collect();
+    Ok(pairs)
+}
 
-    let files: Vec<CodeGeneratorResponseFile> = file_map
+/// Write generated `(relative_path, content)` pairs under `out_root`.
+pub fn write_generated_files(out_root: &Path, pairs: &[(String, String)]) -> Result<()> {
+    for (rel, content) in pairs {
+        let path = out_root.join(rel.trim_start_matches('/'));
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create {}", parent.display()))?;
+        }
+        std::fs::write(&path, content).with_context(|| format!("write {}", path.display()))?;
+    }
+    Ok(())
+}
+
+/// Decode request bytes, generate documentation, encode response.
+pub fn generate(request_bytes: &[u8]) -> Result<Vec<u8>> {
+    let req = CodeGeneratorRequest::decode_from_slice(request_bytes)
+        .map_err(|e| anyhow::anyhow!("decode CodeGeneratorRequest: {e}"))?;
+
+    let pairs = generate_from_input(&req.into())?;
+
+    let files: Vec<CodeGeneratorResponseFile> = pairs
         .into_iter()
         .map(|(name, content)| CodeGeneratorResponseFile {
             name: Some(name),

@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
         println!(
             "protoc-gen-mdbook {} (mdbook {})",
             env!("CARGO_PKG_VERSION"),
-            protoc_gen_mdbook::mdbook_version()
+            protobuf_mdbook::mdbook_version()
         );
         return Ok(());
     }
@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
         .read_to_end(&mut stdin)
         .map_err(|e| anyhow::anyhow!("read stdin: {e}"))?;
 
-    let out = protoc_gen_mdbook::generate(&stdin)?;
+    let out = protobuf_mdbook::generate(&stdin)?;
     io::stdout()
         .write_all(&out)
         .map_err(|e| anyhow::anyhow!("write stdout: {e}"))?;

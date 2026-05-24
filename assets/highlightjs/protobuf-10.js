@@ -5,7 +5,7 @@
  * Upstream: https://github.com/highlightjs/highlight.js/blob/10.1.1/src/languages/protobuf.js
  * Author (upstream): Dan Tao <dan@dtao.org>
  *
- * Local modifications (protoc-gen-mdbook):
+ * Local modifications (protobuf-mdbook):
  * - Wrapped as hljs.registerLanguage IIFE for mdBook's bundled Highlight.js 10.1.1
  * - Extended keywords: syntax, edition, extend, reserved, map, weak, public
  */

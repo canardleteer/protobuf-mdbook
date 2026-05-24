@@ -7,11 +7,11 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
-repository = "https://github.com/canardleteer/protoc-gen-mdbook"
-homepage = "https://github.com/canardleteer/protoc-gen-mdbook"
-documentation = "https://github.com/canardleteer/protoc-gen-mdbook#readme"
+repository = "https://github.com/canardleteer/protobuf-mdbook"
+homepage = "https://github.com/canardleteer/protobuf-mdbook"
+documentation = "https://github.com/canardleteer/protobuf-mdbook#readme"
 readme = "README.md"
-description = "protoc plugin: protobuf schema documentation as mdBook projects or Markdown."
+description = "protobuf-mdbook CLI and protoc-gen-mdbook plugin: schema documentation as mdBook projects or Markdown."
 keywords = ["protoc", "protobuf", "mdbook", "markdown", "documentation"]
 categories = ["development-tools", "command-line-utilities"]
 
@@ -30,7 +30,7 @@ serde_json = "1.0"
 sha2 = "0.10"
 
 [package]
-name = "protoc-gen-mdbook"
+name = "protobuf-mdbook"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -50,16 +50,24 @@ path = "src/lib.rs"
 name = "protoc-gen-mdbook"
 path = "src/main.rs"
 
+[[bin]]
+name = "protobuf-mdbook"
+path = "src/bin/protobuf-mdbook.rs"
+
 [dependencies]
 anyhow.workspace = true
 buffa.workspace = true
 buffa-descriptor.workspace = true
+clap.workspace = true
 mdbook-core.workspace = true
 mdbook-driver.workspace = true
 mdbook-summary.workspace = true
+protoc-bin-vendored.workspace = true
 tempfile.workspace = true
 walkdir.workspace = true
 
 [dev-dependencies]
+buffa.workspace = true
+buffa-descriptor.workspace = true
 protoc-bin-vendored.workspace = true
 tempfile.workspace = true

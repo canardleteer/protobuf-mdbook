@@ -1,2 +1,2 @@
 [alias]
-xtask = "run --package protoc-gen-mdbook-xtask --"
+xtask = "run --package protobuf-mdbook-xtask --"

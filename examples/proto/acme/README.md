@@ -1,10 +1,10 @@
 # Acme APIs
 
 Overview of the Acme example protobuf modules used by the
-[`protoc-gen-mdbook`](https://github.com/canardleteer/protoc-gen-mdbook/)
+[`protobuf-mdbook`](https://github.com/canardleteer/protobuf-mdbook/)
 fixtures.
 
-## Example output from protoc-gen-mdbook
+## Example output from protobuf-mdbook
 
 - **Mermaid diagrams** — only in `acme.example.v1` (flowchart and sequence
   diagrams in proto comments; no Mermaid in v2 or v3alpha1).

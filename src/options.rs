@@ -160,7 +160,7 @@ pub fn parse_parameter(parameter: &Option<String>) -> Result<Options> {
 
     if saw_markdown_only {
         eprintln!(
-            "protoc-gen-mdbook: `markdown_only` is deprecated (default output is markdown-only); use `init` for a full mdBook project"
+            "protobuf-mdbook: `markdown_only` is deprecated (default output is markdown-only); use `init` for a full mdBook project"
         );
     }
 

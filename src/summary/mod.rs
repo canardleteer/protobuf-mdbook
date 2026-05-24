@@ -243,6 +243,7 @@ fn push_entity_items(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::options::Layout;
     use crate::options::Options;
     use crate::proto_markdown::{CompanionDoc, companion_output_name};
     use crate::render::build_link_context;
@@ -307,6 +308,97 @@ mod tests {
         assert!(!md.contains("example/v1"));
         assert!(!md.contains("example —"));
         assert!(md.contains("[acme.example.v1](packages/acme.example.v1.md)"));
+    }
+
+    #[test]
+    fn render_summary_entity_layout_lists_entities() {
+        let file = rich_file("acme.example.v1");
+        let proto_files = vec![file.clone()];
+        let file_to_generate = vec!["acme/example/v1/a.proto".into()];
+        let opts = Options {
+            summary: true,
+            layout: Layout::Entity,
+            no_proto_markdown: true,
+            ..Options::default()
+        };
+        let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
+        by_package.insert(
+            "acme.example.v1".into(),
+            vec![("acme/example/v1/a.proto", &file)],
+        );
+        let links = build_link_context(&by_package, &opts);
+        let out =
+            render_summary(&proto_files, &file_to_generate, &opts, &links, &[]).expect("summary");
+        let md = out.1;
+        mdbook_summary::parse_summary(&md).expect("valid SUMMARY");
+        assert!(md.contains("Message EchoUnaryRequest"));
+        assert!(md.contains("Service EchoService"));
+    }
+
+    #[test]
+    fn render_summary_split_layout_nests_entities() {
+        let file = rich_file("acme.example.v1");
+        let proto_files = vec![file.clone()];
+        let file_to_generate = vec!["acme/example/v1/a.proto".into()];
+        let opts = Options {
+            summary: true,
+            layout: Layout::Split,
+            no_proto_markdown: true,
+            ..Options::default()
+        };
+        let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
+        by_package.insert(
+            "acme.example.v1".into(),
+            vec![("acme/example/v1/a.proto", &file)],
+        );
+        let links = build_link_context(&by_package, &opts);
+        let out =
+            render_summary(&proto_files, &file_to_generate, &opts, &links, &[]).expect("summary");
+        let md = out.1;
+        mdbook_summary::parse_summary(&md).expect("valid SUMMARY");
+        assert!(md.contains("[acme.example.v1]"));
+        assert!(md.contains("Message EchoUnaryRequest"));
+    }
+
+    #[test]
+    fn render_summary_with_companions_uses_nav_tree() {
+        let companions = vec![companion("acme/example/v1", "README", "v1 README")];
+        let file = dummy_file("acme.example.v1");
+        let proto_files = vec![file.clone()];
+        let file_to_generate = vec!["acme/example/v1/a.proto".into()];
+        let opts = Options {
+            summary: true,
+            ..Options::default()
+        };
+        let mut by_package: BTreeMap<String, Vec<(&str, &FileDescriptorProto)>> = BTreeMap::new();
+        by_package.insert(
+            "acme.example.v1".into(),
+            vec![("acme/example/v1/a.proto", &file)],
+        );
+        let links = build_link_context(&by_package, &opts);
+        let out = render_summary(&proto_files, &file_to_generate, &opts, &links, &companions)
+            .expect("summary");
+        let md = out.1;
+        mdbook_summary::parse_summary(&md).expect("valid SUMMARY");
+        assert!(md.contains("[acme.example.v1 - v1 README]"));
+        assert!(md.contains("[acme.example.v1](packages/acme.example.v1.md)"));
+    }
+
+    fn rich_file(pkg: &str) -> FileDescriptorProto {
+        use buffa_descriptor::generated::descriptor::{DescriptorProto, ServiceDescriptorProto};
+        FileDescriptorProto {
+            name: Some("acme/example/v1/a.proto".into()),
+            package: Some(pkg.into()),
+            message_type: vec![DescriptorProto {
+                name: Some("EchoUnaryRequest".into()),
+                ..Default::default()
+            }],
+            service: vec![ServiceDescriptorProto {
+                name: Some("EchoService".into()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
     }
 
     fn dummy_file(pkg: &str) -> FileDescriptorProto {

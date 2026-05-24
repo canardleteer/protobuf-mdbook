@@ -1,6 +1,6 @@
 # Developer notes — v3alpha1 fixtures
 
-Internal notes for maintainers of `protoc-gen-mdbook` example protos. **Lorem
+Internal notes for maintainers of `protobuf-mdbook` example protos. **Lorem
 ipsum** filler below is intentional stress text for mdBook preprocessors.
 
 ## Conventions
