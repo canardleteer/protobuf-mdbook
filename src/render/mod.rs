@@ -4,6 +4,7 @@ pub mod cel_fence;
 pub mod comments;
 pub mod entity;
 pub mod links;
+pub mod markdown_doc;
 pub mod package;
 pub mod proto_syntax;
 pub mod source;

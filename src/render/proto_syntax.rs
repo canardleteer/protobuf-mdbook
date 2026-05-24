@@ -4,10 +4,12 @@
 //! enum, service, RPC) are emitted as Markdown *before* the fence. Leading comments
 //! on fields and enum values stay as `//` lines inside the synthesized block.
 
+use crate::options::EscapeTags;
 use crate::plugin_api::codegen::rpc_kind;
 use crate::render::cel_fence::split_message_cel_blocks;
 use crate::render::comments::{CommentIndex, path};
 use crate::render::links::LinkContext;
+use crate::render::markdown_doc::format_markdown_doc;
 use crate::render::md_heading;
 use crate::render::source::{SourceCache, push_indented_lines};
 use buffa_descriptor::generated::descriptor::field_descriptor_proto::Type;
@@ -21,6 +23,7 @@ use std::path::Path;
 pub struct RenderContext<'a> {
     pub links: Option<&'a LinkContext>,
     pub from_md: &'a Path,
+    pub escape_tags: EscapeTags,
 }
 
 pub fn synthesize_message_with_file(
@@ -29,6 +32,7 @@ pub fn synthesize_message_with_file(
     mi: usize,
     msg: &DescriptorProto,
     source: Option<&mut SourceCache>,
+    ctx: Option<&RenderContext<'_>>,
 ) -> String {
     let name = msg.name.as_deref().unwrap_or("Message");
     let entity_doc = idx.leading_message(mi);
@@ -43,7 +47,8 @@ pub fn synthesize_message_with_file(
     }
     synthesize_message_fields(&mut body, idx, mi, msg, file_source.as_deref());
     body.push_str("}\n");
-    render_proto_fence(file_name, entity_doc, &body)
+    let escape_tags = ctx.map(|c| c.escape_tags).unwrap_or(EscapeTags::Off);
+    render_proto_fence(file_name, entity_doc, &body, escape_tags)
 }
 
 /// Enum: leading comment as Markdown summary, then a `protobuf` fence for the definition.
@@ -52,6 +57,7 @@ pub fn synthesize_enum(
     idx: &CommentIndex<'_>,
     ei: usize,
     en: &EnumDescriptorProto,
+    ctx: Option<&RenderContext<'_>>,
 ) -> String {
     let name = en.name.as_deref().unwrap_or("Enum");
     let entity_doc = idx.leading_enum(ei);
@@ -67,7 +73,8 @@ pub fn synthesize_enum(
         ));
     }
     body.push_str("}\n");
-    render_proto_fence(file_name, entity_doc, &body)
+    let escape_tags = ctx.map(|c| c.escape_tags).unwrap_or(EscapeTags::Off);
+    render_proto_fence(file_name, entity_doc, &body, escape_tags)
 }
 
 /// Render one service: heading, file path, service doc, then each RPC (signature, options, doc).
@@ -87,7 +94,8 @@ pub fn synthesize_service(
         out.push_str(&format!("*`{file_name}`*\n\n"));
     }
     if let Some(c) = idx.leading_service(si) {
-        push_markdown_doc(&mut out, c);
+        let escape_tags = ctx.map(|c| c.escape_tags).unwrap_or(EscapeTags::Off);
+        push_markdown_doc(&mut out, c, escape_tags);
     }
 
     for (mi, method) in svc.method.iter().enumerate() {
@@ -110,7 +118,8 @@ fn push_rpc_section(
         push_proto_fence_body(out, &body);
     }
     if let Some(c) = idx.leading_method(si, mi) {
-        push_markdown_doc(out, c);
+        let escape_tags = ctx.map(|c| c.escape_tags).unwrap_or(EscapeTags::Off);
+        push_markdown_doc(out, c, escape_tags);
     }
 }
 
@@ -224,10 +233,15 @@ fn format_uninterpreted_option(opt: &UninterpretedOption) -> Option<String> {
     Some(format!("option {name} = {value};"))
 }
 
-fn render_proto_fence(file_name: &str, entity_doc: Option<&str>, body: &str) -> String {
+fn render_proto_fence(
+    file_name: &str,
+    entity_doc: Option<&str>,
+    body: &str,
+    escape_tags: EscapeTags,
+) -> String {
     let mut out = String::new();
     if let Some(c) = entity_doc {
-        push_markdown_doc(&mut out, c);
+        push_markdown_doc(&mut out, c, escape_tags);
     }
     if !file_name.is_empty() {
         out.push_str(&format!("*`{file_name}`*\n\n"));
@@ -402,9 +416,10 @@ fn scalar_type_name(ty: Option<Type>) -> Option<String> {
     )
 }
 
-/// Entity / RPC docs: verbatim Markdown (not inside a code fence).
-fn push_markdown_doc(out: &mut String, comment: &str) {
-    out.push_str(&dedent_comment(comment));
+/// Entity / RPC docs: verbatim Markdown by default; optional `escape_tags` transforms prose.
+fn push_markdown_doc(out: &mut String, comment: &str, escape_tags: EscapeTags) {
+    let formatted = format_markdown_doc(&dedent_comment(comment), escape_tags);
+    out.push_str(&formatted);
     out.push_str("\n\n");
 }
 
@@ -484,6 +499,7 @@ mod tests {
             "foo.proto",
             Some("```mermaid\nflowchart LR\n  A --> B\n```"),
             "message X {}\n",
+            EscapeTags::Off,
         );
         assert!(md.contains("```mermaid"));
         let fence_start = md.find("```protobuf").expect("fence");
@@ -522,7 +538,7 @@ mod tests {
         };
         let file = crate::plugin_api::FileDescriptorProto::default();
         let idx = CommentIndex::from_file(&file);
-        let md = synthesize_message_with_file("gateway.proto", &idx, 0, &msg, None);
+        let md = synthesize_message_with_file("gateway.proto", &idx, 0, &msg, None, None);
         assert!(md.contains("oneof payload"));
         assert!(md.contains("RelayOpen open = 1;"));
         let oneof_pos = md.find("oneof payload").expect("oneof");

@@ -1,10 +1,10 @@
 //! Byte-identical output regression against checked-in golden fixtures.
 //!
-//! Refresh baselines: `UPDATE_GOLDEN=1 cargo test output_regression -- --nocapture`
+//! Refresh baselines: `cargo xtask update-golden`
 
 mod common;
 
-use common::{Backend, run_examples_in};
+use common::{Backend, run_examples_in, run_fixture_proto_in};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -13,6 +13,8 @@ struct Scenario {
     name: &'static str,
     layout: &'static str,
     extra_opt: &'static str,
+    /// When set, generate from this fixture proto instead of `examples/proto/`.
+    fixture_proto: Option<&'static str>,
     /// When set, only these paths are compared (relative to output root).
     paths_only: Option<&'static [&'static str]>,
 }
@@ -22,37 +24,57 @@ const SCENARIOS: &[Scenario] = &[
         name: "package_default",
         layout: "package",
         extra_opt: "",
+        fixture_proto: None,
         paths_only: None,
     },
     Scenario {
         name: "entity",
         layout: "entity",
         extra_opt: "",
+        fixture_proto: None,
         paths_only: None,
     },
     Scenario {
         name: "split",
         layout: "split",
         extra_opt: "",
+        fixture_proto: None,
         paths_only: None,
     },
     Scenario {
         name: "summary_companion",
         layout: "package",
         extra_opt: "summary",
+        fixture_proto: None,
         paths_only: Some(&["src/SUMMARY.md", "src/packages/acme.example.v1.md"]),
     },
     Scenario {
         name: "summary_entity_flat",
         layout: "entity",
         extra_opt: "summary,no_proto_markdown",
+        fixture_proto: None,
         paths_only: Some(&["src/SUMMARY.md"]),
     },
     Scenario {
         name: "summary_split_flat",
         layout: "split",
         extra_opt: "summary,no_proto_markdown",
+        fixture_proto: None,
         paths_only: Some(&["src/SUMMARY.md"]),
+    },
+    Scenario {
+        name: "escape_tags_backticks",
+        layout: "",
+        extra_opt: "layout=package,escape_tags",
+        fixture_proto: Some("escape_tags_comments.proto"),
+        paths_only: Some(&["src/packages/acme.example.tagdoc.md"]),
+    },
+    Scenario {
+        name: "escape_tags_entities",
+        layout: "",
+        extra_opt: "layout=package,escape_tags=entities",
+        fixture_proto: Some("escape_tags_comments.proto"),
+        paths_only: Some(&["src/packages/acme.example.tagdoc.md"]),
     },
 ];
 
@@ -87,12 +109,16 @@ fn collect_tree_inner(root: &Path, dir: &Path, out: &mut BTreeMap<String, String
 
 fn generate_output(scenario: &Scenario) -> BTreeMap<String, String> {
     let out = tempfile::tempdir().expect("tempdir");
-    run_examples_in(
-        out.path(),
-        scenario.layout,
-        scenario.extra_opt,
-        Backend::ProtocPlugin,
-    );
+    if let Some(proto) = scenario.fixture_proto {
+        run_fixture_proto_in(out.path(), proto, scenario.extra_opt, Backend::ProtocPlugin);
+    } else {
+        run_examples_in(
+            out.path(),
+            scenario.layout,
+            scenario.extra_opt,
+            Backend::ProtocPlugin,
+        );
+    }
     let tree = collect_tree(out.path());
     match scenario.paths_only {
         None => tree,

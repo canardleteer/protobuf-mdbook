@@ -4,6 +4,7 @@ use crate::options::Options;
 use crate::plugin_api::FileDescriptorProto;
 use crate::render::comments::{CommentIndex, package_overview};
 use crate::render::links::{EntityKind, LinkContext};
+use crate::render::markdown_doc::format_markdown_doc;
 use crate::render::proto_syntax::{
     RenderContext, synthesize_enum, synthesize_message_with_file, synthesize_service,
 };
@@ -25,7 +26,7 @@ pub fn render_entity_pages(
         let index_path = opts.output_path(index_rel.to_str().unwrap_or_default());
         let mut index = md_heading(1, package);
         if let Some(overview) = package_overview(files) {
-            index.push_str(&overview);
+            index.push_str(&format_markdown_doc(&overview, opts.escape_tags));
             push_paragraph_break(&mut index);
         }
         index.push_str(&md_heading(2, "Contents"));
@@ -47,6 +48,11 @@ pub fn render_entity_pages(
                 .entity_path(package, EntityKind::Message, name)
                 .expect("entity");
             let path = opts.output_path(rel.to_str().unwrap_or_default());
+            let ctx = RenderContext {
+                links: Some(links),
+                from_md: rel.as_path(),
+                escape_tags: opts.escape_tags,
+            };
             let mut page = md_heading(1, name);
             page.push_str(&synthesize_message_with_file(
                 proto_name,
@@ -54,6 +60,7 @@ pub fn render_entity_pages(
                 i,
                 msg,
                 Some(source),
+                Some(&ctx),
             ));
             pages.push((path, page));
         }
@@ -63,8 +70,13 @@ pub fn render_entity_pages(
                 .entity_path(package, EntityKind::Enum, name)
                 .expect("entity");
             let path = opts.output_path(rel.to_str().unwrap_or_default());
+            let ctx = RenderContext {
+                links: Some(links),
+                from_md: rel.as_path(),
+                escape_tags: opts.escape_tags,
+            };
             let mut page = md_heading(1, name);
-            page.push_str(&synthesize_enum(proto_name, &idx, i, en));
+            page.push_str(&synthesize_enum(proto_name, &idx, i, en, Some(&ctx)));
             pages.push((path, page));
         }
         for (i, svc) in file.service.iter().enumerate() {
@@ -76,6 +88,7 @@ pub fn render_entity_pages(
             let ctx = RenderContext {
                 links: Some(links),
                 from_md: rel.as_path(),
+                escape_tags: opts.escape_tags,
             };
             let page = synthesize_service(proto_name, &idx, i, svc, 1, Some(&ctx));
             pages.push((path, page));

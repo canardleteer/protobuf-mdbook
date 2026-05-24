@@ -245,6 +245,7 @@ accept the same string in `request.parameter`.
 | `no_proto_highlight` | init only | Skip protobuf Highlight.js grammar in `theme/index.hbs` (default: on) |
 | `no_cel_highlight` | init only | Skip CEL Highlight.js grammar in `theme/index.hbs` (default: on; independent of protobuf) |
 | `no_proto_markdown` | both | Disable copying companion `.md` beside protos and companion entries in SUMMARY |
+| `escape_tags` \| `escape_tags=backticks` \| `escape_tags=entities` | both | Rewrite HTML-like `<…>` in leading-comment prose so mdBook does not treat them as HTML tags (default mode: inline code; `entities` uses `&lt;…&gt;`) |
 | `markdown_only` | — | Deprecated (ignored); default output is already markdown-only |
 
 `force` is always implied (non-interactive protoc).
