@@ -104,7 +104,9 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
 
 ## Output conventions
 
-Options are comma-separated on `--mdbook_opt=` (or `CodeGeneratorRequest.parameter`).
+Options for **`protoc-gen-mdbook`** are comma-separated on **`--mdbook_opt=`**
+(or `CodeGeneratorRequest.parameter`). **`protobuf-mdbook`** exposes the same
+semantics as native clap flags (hyphens); see README **Generator options**.
 
 ### Where files land (protoc contract)
 

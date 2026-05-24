@@ -122,14 +122,14 @@ fn run_cli_on_examples(out_dir: &Path, mdbook_opt: &str) -> Result<()> {
         out_dir.display()
     );
 
+    let cli_args = protobuf_mdbook::options::parameter_to_cli_args(mdbook_opt)?;
+
     let mut cmd = Command::new(cli);
-    cmd.current_dir(&proto_root)
-        .arg("-o")
-        .arg(out_dir)
-        .arg("--opt")
-        .arg(mdbook_opt)
-        .arg("--opt")
-        .arg("proto_path=.");
+    cmd.current_dir(&proto_root).arg("-o").arg(out_dir);
+    for arg in &cli_args {
+        cmd.arg(arg);
+    }
+    cmd.arg("-I").arg(".");
     for rel in &inputs {
         cmd.arg(rel);
     }

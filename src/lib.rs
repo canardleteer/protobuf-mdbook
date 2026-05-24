@@ -20,7 +20,7 @@ use crate::plugin_api::{
 };
 use anyhow::{Context, Result, bail};
 use buffa::Message;
-use options::parse_parameter;
+use options::{Options, parse_parameter};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -31,7 +31,10 @@ use crate::book_config::apply_book_config;
 pub struct GenerateInput {
     pub proto_file: Vec<FileDescriptorProto>,
     pub file_to_generate: Vec<String>,
+    /// Protoc plugin options (`request.parameter` / `--mdbook_opt=`).
     pub parameter: Option<String>,
+    /// Pre-parsed options from the `protobuf-mdbook` CLI (takes precedence over `parameter`).
+    pub options: Option<Options>,
     /// CLI-resolved search roots; protoc plugin leaves empty and uses `proto_path=` in parameter.
     pub proto_search_paths: Vec<PathBuf>,
 }
@@ -42,6 +45,7 @@ impl From<CodeGeneratorRequest> for GenerateInput {
             proto_file: req.proto_file,
             file_to_generate: req.file_to_generate,
             parameter: req.parameter,
+            options: None,
             proto_search_paths: Vec::new(),
         }
     }
@@ -58,7 +62,10 @@ pub fn generate_from_input(input: &GenerateInput) -> Result<Vec<(String, String)
         bail!("file_to_generate is empty");
     }
 
-    let mut opts = parse_parameter(&input.parameter)?;
+    let mut opts = match &input.options {
+        Some(o) => o.clone(),
+        None => parse_parameter(&input.parameter)?,
+    };
     apply_book_config(&mut opts)?;
     if !input.proto_search_paths.is_empty() {
         opts.proto_search_path = input.proto_search_paths.clone();

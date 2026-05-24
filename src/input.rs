@@ -1,6 +1,7 @@
 //! Resolve CLI / filesystem inputs into descriptors for [`GenerateInput`](crate::GenerateInput).
 
 use crate::GenerateInput;
+use crate::options::Options;
 use crate::plugin_api::{CodeGeneratorRequest, FileDescriptorProto};
 use crate::proto_deps;
 use anyhow::{Context, Result, bail};
@@ -45,11 +46,12 @@ pub struct ResolvedInput {
 
 impl ResolvedInput {
     /// Build generation input; CLI search roots travel on the struct, not in `parameter`.
-    pub fn into_generate_input(self, parameter: Option<String>) -> GenerateInput {
+    pub fn into_generate_input(self, options: Options) -> GenerateInput {
         GenerateInput {
             proto_file: self.proto_file,
             file_to_generate: self.file_to_generate,
-            parameter,
+            parameter: None,
+            options: Some(options),
             proto_search_paths: self.proto_search_paths,
         }
     }

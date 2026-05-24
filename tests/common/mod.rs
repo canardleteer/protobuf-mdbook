@@ -101,13 +101,14 @@ fn run_cli_examples_in(out: &Path, layout: &str, extra_opt: &str) {
     let proto_dir = examples_proto_dir();
 
     let opt = protobuf_mdbook::examples::format_examples_mdbook_opt(layout, extra_opt);
+    let cli_args = protobuf_mdbook::options::parameter_to_cli_args(&opt).expect("cli args");
 
     let mut cmd = Command::new(cli);
-    cmd.current_dir(&proto_dir)
-        .arg("-o")
-        .arg(out)
-        .arg("--opt")
-        .arg(&opt);
+    cmd.current_dir(&proto_dir).arg("-o").arg(out);
+    for arg in &cli_args {
+        cmd.arg(arg);
+    }
+    cmd.arg("-I").arg(".");
     for rel in EXAMPLE_PROTO_INPUTS {
         cmd.arg(rel);
     }
@@ -164,7 +165,11 @@ pub fn run_fixture_cli_proto(out: &Path, proto_file: &str, extra_opt: &str) {
         .arg(proto_file)
         .current_dir(&fixture_dir);
     if !extra_opt.is_empty() {
-        cmd.args(["--opt", extra_opt]);
+        let cli_args =
+            protobuf_mdbook::options::parameter_to_cli_args(extra_opt).expect("cli args");
+        for arg in &cli_args {
+            cmd.arg(arg);
+        }
     }
     let status = cmd.status().expect("spawn protobuf-mdbook");
     assert!(
@@ -279,8 +284,10 @@ pub fn run_single_echo_package(out: &Path, backend: Backend) {
                 .args([
                     "-o",
                     out.to_str().expect("utf8"),
-                    "--opt",
-                    "layout=package,proto_path=.",
+                    "--layout",
+                    "package",
+                    "-I",
+                    ".",
                     "acme/example/v1/echo.proto",
                 ])
                 .status()
