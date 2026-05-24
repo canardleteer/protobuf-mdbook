@@ -79,7 +79,7 @@ Point at a directory containing `buf.yaml`; BSR deps resolve automatically:
 
 ```bash
 # scaffold mdBook once (under the hood, this calls `mdbook init` via API integration)
-protobuf-mdbook -o ./api-book --opt init examples/proto
+protobuf-mdbook -o ./api-book --init examples/proto
 
 # update only the generated markdown, without re-initializing the mdBook scaffolding.
 protobuf-mdbook -o ./api-book examples/proto
@@ -104,9 +104,8 @@ extension is just a convention).
 
 Via: `buf build -o ./descriptors.binpb`.
 
-**`--opt`** accepts the same comma-separated values as protoc **`--mdbook_opt`**
-(`init`, `layout=…`, `book=…`, etc.). Run **`protobuf-mdbook --version`** for
-the pinned mdBook release.
+Generator options are listed in [Generator options](#generator-options) below.
+Run **`protobuf-mdbook --version`** for the pinned mdBook release.
 
 #### `protoc`
 
@@ -177,8 +176,9 @@ itself does not), or use a discovery script / **`cargo xtask book-refresh`** for
 this repo’s examples.
 
 The same **`init`** / ongoing refresh flow works with **`protobuf-mdbook`** —
-see [Standalone CLI](#standalone-cli-protobuf-mdbook) — using **`-o`** and
-**`--opt`** instead of **`--mdbook_out`** / **`--mdbook_opt`**.
+see [Standalone CLI](#standalone-cli-protobuf-mdbook) — using **`-o` / `--output`**
+and native flags such as **`--init`**, **`--layout`**, and **`--book`** instead
+of **`--mdbook_out`** / **`--mdbook_opt`**.
 
 ## Output modes
 
@@ -205,7 +205,7 @@ Pass **`book=`** (book root directory or path to `book.toml`) to load
 `markdown_root={src}/packages` and `summary_path={src}/SUMMARY.md`. Explicit
 `markdown_root=` / `summary_path=` still override. Pair with **`mdbook_out=`**
 in options when validating that the output root matches the book root (plugin:
-**`--mdbook_opt`**; CLI: **`--opt`**).
+**`--mdbook_opt`**; CLI: **`-o` / `--output`** with **`--book`**).
 
 **Default refresh** (no `init`, no `summary`) updates only package markdown
 under `markdown_root`; it does not rewrite `book.toml`, theme, init `README.md`,
@@ -225,28 +225,33 @@ into adjacent `cel` fenced blocks when present in source.
 
 ## Generator options
 
-Comma-separated values. Pass them as **`--mdbook_opt=…`** with the protoc plugin
-or **`--opt=…`** (repeatable) with **`protobuf-mdbook`**. Plugin requests also
-accept the same string in `request.parameter`.
+Both binaries share the same semantics; spelling differs by surface:
 
-| Option | Applies to | Purpose |
-|--------|------------|---------|
-| `init` | init | mdBook scaffold + package `SUMMARY` + `README.md` |
-| `summary` | default | Optional SUMMARY without mdBook tree |
-| `layout=package` \| `entity` \| `split` | both | Doc rollup (default `package`) |
-| `book_root=<path>` | both | Subdirectory under output root (default `.`) |
-| `book=<path>` | refresh | Book root or `book.toml`; loads `[book] src` via mdbook-core |
-| `mdbook_out=<path>` | refresh | Validate output root matches `book=` (warn if divergent) |
-| `markdown_root=<path>` | both | API markdown directory (default `src/packages`, or `{src}/packages` with `book=`) |
-| `summary_path=<path>` | both | SUMMARY when `summary`/`init` (default `src/SUMMARY.md`, or `{src}/SUMMARY.md` with `book=`) |
-| `proto_path=<dir>` \| `dir:a:dir:b` | both | Search path(s) for `.proto` sources |
-| `title=<text>` | init only | `book.toml` title (default **Protobuf documentation** if omitted) |
-| `ignore=git` \| `ignore=none` | init only | Whether init emits `.gitignore` (default `ignore=git`) |
-| `no_proto_highlight` | init only | Skip protobuf Highlight.js grammar in `theme/index.hbs` (default: on) |
-| `no_cel_highlight` | init only | Skip CEL Highlight.js grammar in `theme/index.hbs` (default: on; independent of protobuf) |
-| `no_proto_markdown` | both | Disable copying companion `.md` beside protos and companion entries in SUMMARY |
-| `escape_tags` \| `escape_tags=backticks` \| `escape_tags=entities` | both | Rewrite HTML-like `<…>` in leading-comment prose so mdBook does not treat them as HTML tags (default mode: inline code; `entities` uses `&lt;…&gt;`) |
-| `markdown_only` | — | Deprecated (ignored); default output is already markdown-only |
+- **`protobuf-mdbook`:** native clap flags with hyphens (`--layout entity`,
+  `--no-proto-highlight`); repeatable path flags where noted (`-I` /
+  `--proto-path`).
+- **`protoc-gen-mdbook`:** comma-separated on **`--mdbook_opt=…`** (or
+  `CodeGeneratorRequest.parameter`); underscore tokens (`layout=entity`,
+  `no_proto_highlight`).
+
+| `protobuf-mdbook` | Protoc (`--mdbook_opt`) | Applies to | Purpose |
+|-------------------|-------------------------|------------|---------|
+| `--init` | `init` | init | mdBook scaffold + package `SUMMARY` + `README.md` |
+| `--summary` | `summary` | default | Optional SUMMARY without mdBook tree |
+| `--layout package` \| `entity` \| `split` | `layout=package` \| `entity` \| `split` | both | Doc rollup (default `package`) |
+| `--book-root <path>` | `book_root=<path>` | both | Subdirectory under output root (default `.`) |
+| `--book <path>` | `book=<path>` | refresh | Book root or `book.toml`; loads `[book] src` via mdbook-core |
+| `-o` / `--output <path>` | `mdbook_out=<path>` | refresh | Validate output root matches `book=` (warn if divergent) |
+| `--markdown-root <path>` | `markdown_root=<path>` | both | API markdown directory (default `src/packages`, or `{src}/packages` with `book=`) |
+| `--summary-path <path>` | `summary_path=<path>` | both | SUMMARY when `summary`/`init` (default `src/SUMMARY.md`, or `{src}/SUMMARY.md` with `book=`) |
+| `-I` / `--proto-path <dir>` (repeatable) | `proto_path=<dir>` \| `dir:a:dir:b` | both | Search path(s) for `.proto` sources |
+| `--title <text>` | `title=<text>` | init only | `book.toml` title (default **Protobuf documentation** if omitted) |
+| `--ignore git` \| `none` | `ignore=git` \| `ignore=none` | init only | Whether init emits `.gitignore` (default `git`) |
+| `--no-proto-highlight` | `no_proto_highlight` | init only | Skip protobuf Highlight.js grammar in `theme/index.hbs` (default: on) |
+| `--no-cel-highlight` | `no_cel_highlight` | init only | Skip CEL Highlight.js grammar in `theme/index.hbs` (default: on; independent of protobuf) |
+| `--no-proto-markdown` | `no_proto_markdown` | both | Disable copying companion `.md` beside protos and companion entries in SUMMARY |
+| `--escape-tags` \| `--escape-tags entities` | `escape_tags` \| `escape_tags=backticks` \| `escape_tags=entities` | both | Rewrite HTML-like `<…>` in leading-comment prose so mdBook does not treat them as HTML tags (bare flag: inline code; `entities` uses `&lt;…&gt;`) |
+| — | `markdown_only` | — | Deprecated (ignored); default output is already markdown-only |
 
 `force` is always implied (non-interactive protoc).
 

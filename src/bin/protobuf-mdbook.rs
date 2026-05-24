@@ -5,7 +5,7 @@
 use anyhow::{Context, Result, bail};
 use clap::{Parser, ValueEnum};
 use protobuf_mdbook::input::{Compiler, ResolveArgs, resolve_inputs};
-use protobuf_mdbook::options::parse_parameter;
+use protobuf_mdbook::options::{CliOptionsInput, EscapeTags, Layout, build_options_from_cli};
 use protobuf_mdbook::{generate_from_input, write_generated_files};
 use std::path::PathBuf;
 
@@ -25,6 +25,31 @@ impl From<CompilerArg> for Compiler {
     }
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum, Default)]
+enum LayoutArg {
+    #[default]
+    Package,
+    Entity,
+    Split,
+}
+
+impl From<LayoutArg> for Layout {
+    fn from(value: LayoutArg) -> Self {
+        match value {
+            LayoutArg::Package => Layout::Package,
+            LayoutArg::Entity => Layout::Entity,
+            LayoutArg::Split => Layout::Split,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, Default)]
+enum IgnoreArg {
+    #[default]
+    Git,
+    None,
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "protobuf-mdbook",
@@ -40,9 +65,57 @@ struct Cli {
     #[arg(short = 'I', long = "proto-path")]
     proto_path: Vec<PathBuf>,
 
-    /// Plugin option (repeatable; same values as `--mdbook_opt`).
-    #[arg(long = "opt")]
-    opts: Vec<String>,
+    /// Scaffold a full mdBook project (theme, `book.toml`, package SUMMARY, README).
+    #[arg(long)]
+    init: bool,
+
+    /// Emit SUMMARY without mdBook scaffold.
+    #[arg(long)]
+    summary: bool,
+
+    /// Documentation page layout (default: package).
+    #[arg(long, value_enum, default_value_t = LayoutArg::Package)]
+    layout: LayoutArg,
+
+    /// Subdirectory under the output root for generated files (default `.`).
+    #[arg(long = "book-root")]
+    book_root: Option<String>,
+
+    /// Book root or `book.toml`; loads `[book] src` via mdbook-core on refresh.
+    #[arg(long)]
+    book: Option<String>,
+
+    /// API markdown directory relative to book root (default `src/packages`).
+    #[arg(long = "markdown-root")]
+    markdown_root: Option<String>,
+
+    /// SUMMARY path when `--summary` / `--init` (default `src/SUMMARY.md`).
+    #[arg(long = "summary-path")]
+    summary_path: Option<String>,
+
+    /// `book.toml` title when `--init` (default **Protobuf documentation**).
+    #[arg(long)]
+    title: Option<String>,
+
+    /// Whether `--init` emits `.gitignore` (default: git).
+    #[arg(long, value_enum, default_value_t = IgnoreArg::Git)]
+    ignore: IgnoreArg,
+
+    /// Skip protobuf Highlight.js grammar in `theme/index.hbs` (`--init` only).
+    #[arg(long = "no-proto-highlight")]
+    no_proto_highlight: bool,
+
+    /// Skip CEL Highlight.js grammar in `theme/index.hbs` (`--init` only).
+    #[arg(long = "no-cel-highlight")]
+    no_cel_highlight: bool,
+
+    /// Disable copying companion `.md` beside protos and companion SUMMARY entries.
+    #[arg(long = "no-proto-markdown")]
+    no_proto_markdown: bool,
+
+    /// Rewrite HTML-like `<…>` in leading-comment prose (bare flag: backticks).
+    #[arg(long = "escape-tags", num_args = 0..=1, default_missing_value = "backticks")]
+    escape_tags: Option<String>,
 
     /// Prebuilt `FileDescriptorSet` (`.binpb`, `.fds`, …); repeatable.
     #[arg(long = "descriptor-set")]
@@ -89,7 +162,10 @@ fn main() -> Result<()> {
         bail!("--request cannot be combined with INPUT paths");
     }
 
-    let parameter = merge_opts(&cli.opts);
+    let mut options = build_options_from_cli(cli_options_input(&cli)?)?;
+    if let Some(out) = &cli.output {
+        options.mdbook_out = Some(out.to_string_lossy().into_owned());
+    }
 
     let resolve = ResolveArgs {
         compiler: cli.compiler.into(),
@@ -103,11 +179,10 @@ fn main() -> Result<()> {
     };
 
     let resolved = resolve_inputs(&resolve)?;
-    let mut generate_input = resolved.into_generate_input(parameter);
-    merge_cli_output(&mut generate_input, cli.output.as_deref())?;
+    let generate_input = resolved.into_generate_input(options.clone());
 
-    let out_root = output_root(cli.output.as_deref(), &generate_input)?;
-    if out_root.exists() && opts_init(&generate_input)? {
+    let out_root = output_root(cli.output.as_deref(), &options)?;
+    if out_root.exists() && options.init {
         std::fs::remove_dir_all(&out_root)
             .with_context(|| format!("clear output before init at {}", out_root.display()))?;
     }
@@ -119,56 +194,71 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn merge_opts(opts: &[String]) -> Option<String> {
-    let joined: Vec<_> = opts
-        .iter()
-        .flat_map(|o| o.split(','))
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .collect();
-    if joined.is_empty() {
-        None
-    } else {
-        Some(joined.join(","))
-    }
+fn cli_options_input(cli: &Cli) -> Result<CliOptionsInput> {
+    Ok(CliOptionsInput {
+        init: cli.init,
+        summary: cli.summary,
+        layout: cli.layout.into(),
+        book_root: cli.book_root.clone(),
+        book: cli.book.clone(),
+        markdown_root: cli.markdown_root.clone(),
+        summary_path: cli.summary_path.clone(),
+        title: cli.title.clone(),
+        ignore_git: matches!(cli.ignore, IgnoreArg::Git),
+        no_proto_highlight: cli.no_proto_highlight,
+        no_cel_highlight: cli.no_cel_highlight,
+        no_proto_markdown: cli.no_proto_markdown,
+        escape_tags: parse_escape_tags(cli.escape_tags.as_deref())?,
+    })
 }
 
-fn merge_cli_output(
-    input: &mut protobuf_mdbook::GenerateInput,
-    output: Option<&std::path::Path>,
-) -> Result<()> {
-    let Some(out) = output else {
-        return Ok(());
-    };
-    let out = out.to_string_lossy();
-    let mut param = input.parameter.take().unwrap_or_default();
-    if !param.contains("mdbook_out=") {
-        if !param.is_empty() {
-            param.push(',');
-        }
-        param.push_str(&format!("mdbook_out={out}"));
+fn parse_escape_tags(value: Option<&str>) -> Result<EscapeTags> {
+    match value {
+        None => Ok(EscapeTags::Off),
+        Some("backticks") => Ok(EscapeTags::Backticks),
+        Some("entities") => Ok(EscapeTags::Entities),
+        Some(other) => bail!("unknown --escape-tags value {other:?}; use backticks or entities"),
     }
-    input.parameter = if param.is_empty() { None } else { Some(param) };
-    Ok(())
 }
 
 fn output_root(
     cli_output: Option<&std::path::Path>,
-    input: &protobuf_mdbook::GenerateInput,
+    options: &protobuf_mdbook::options::Options,
 ) -> Result<PathBuf> {
     if let Some(out) = cli_output {
         return Ok(out.to_path_buf());
     }
-    let opts = parse_parameter(&input.parameter)?;
-    if let Some(mdbook_out) = opts.mdbook_out {
+    if let Some(mdbook_out) = &options.mdbook_out {
         return Ok(PathBuf::from(mdbook_out));
     }
-    if opts.book.is_some() {
-        bail!("`-o / --output` is required unless `mdbook_out=` is set in --opt");
+    if options.book.is_some() {
+        bail!("`-o / --output` is required when `--book` is set");
     }
     bail!("`-o / --output` is required");
 }
 
-fn opts_init(input: &protobuf_mdbook::GenerateInput) -> Result<bool> {
-    Ok(parse_parameter(&input.parameter)?.init)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_escape_tags_values() {
+        assert_eq!(parse_escape_tags(None).unwrap(), EscapeTags::Off);
+        assert_eq!(
+            parse_escape_tags(Some("backticks")).unwrap(),
+            EscapeTags::Backticks
+        );
+        assert_eq!(
+            parse_escape_tags(Some("entities")).unwrap(),
+            EscapeTags::Entities
+        );
+        assert!(parse_escape_tags(Some("bad")).is_err());
+    }
+
+    #[test]
+    fn cli_options_input_maps_ignore() {
+        let cli = Cli::parse_from(["protobuf-mdbook", "-o", "out", "--ignore", "none"]);
+        let input = cli_options_input(&cli).unwrap();
+        assert!(!input.ignore_git);
+    }
 }

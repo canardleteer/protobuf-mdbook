@@ -3,8 +3,9 @@
 use anyhow::{Result, bail};
 use std::path::PathBuf;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Layout {
+    #[default]
     Package,
     Entity,
     Split,
@@ -205,7 +206,7 @@ fn apply_option_token(opts: &mut Options, token: &str, saw_markdown_only: &mut b
 }
 
 /// Init-only and deprecated-option checks after all tokens are applied.
-fn validate_options(opts: &Options, saw_markdown_only: bool) -> Result<()> {
+pub fn validate_options(opts: &Options, saw_markdown_only: bool) -> Result<()> {
     if saw_markdown_only {
         eprintln!(
             "protobuf-mdbook: `markdown_only` is deprecated (default output is markdown-only); use `init` for a full mdBook project"
@@ -253,6 +254,148 @@ pub fn join_book_root(book_root: &str, rel: &str) -> String {
         rel.to_string()
     } else {
         format!("{book_root}/{rel}")
+    }
+}
+
+/// Fields collected from native `protobuf-mdbook` clap flags.
+#[derive(Clone, Debug)]
+pub struct CliOptionsInput {
+    pub init: bool,
+    pub summary: bool,
+    pub layout: Layout,
+    pub book_root: Option<String>,
+    pub book: Option<String>,
+    pub markdown_root: Option<String>,
+    pub summary_path: Option<String>,
+    pub title: Option<String>,
+    pub ignore_git: bool,
+    pub no_proto_highlight: bool,
+    pub no_cel_highlight: bool,
+    pub no_proto_markdown: bool,
+    pub escape_tags: EscapeTags,
+}
+
+impl Default for CliOptionsInput {
+    fn default() -> Self {
+        Self {
+            init: false,
+            summary: false,
+            layout: Layout::Package,
+            book_root: None,
+            book: None,
+            markdown_root: None,
+            summary_path: None,
+            title: None,
+            ignore_git: true,
+            no_proto_highlight: false,
+            no_cel_highlight: false,
+            no_proto_markdown: false,
+            escape_tags: EscapeTags::Off,
+        }
+    }
+}
+
+/// Build validated [`Options`] from native CLI flags.
+pub fn build_options_from_cli(input: CliOptionsInput) -> Result<Options> {
+    let mut opts = Options {
+        init: input.init,
+        summary: input.summary,
+        layout: input.layout,
+        book: input.book,
+        title: input.title,
+        ignore_git: input.ignore_git,
+        no_proto_highlight: input.no_proto_highlight,
+        no_cel_highlight: input.no_cel_highlight,
+        no_proto_markdown: input.no_proto_markdown,
+        escape_tags: input.escape_tags,
+        ..Options::default()
+    };
+
+    if let Some(v) = input.book_root {
+        opts.book_root = normalize_book_root(&v);
+        opts.explicit_book_root = true;
+    }
+    if let Some(v) = input.markdown_root {
+        opts.markdown_root = normalize_rel_path(&v, default_markdown_root())?;
+        opts.explicit_markdown_root = true;
+    }
+    if let Some(v) = input.summary_path {
+        opts.summary_path = normalize_rel_path(&v, default_summary_path())?;
+        opts.explicit_summary_path = true;
+    }
+
+    validate_options(&opts, false)?;
+    Ok(opts)
+}
+
+/// Map parsed options to native `protobuf-mdbook` argv tokens (excluding `-o`, `-I`, inputs).
+pub fn options_to_cli_args(opts: &Options) -> Vec<String> {
+    let mut args = Vec::new();
+    if opts.init {
+        args.push("--init".into());
+    }
+    if opts.summary {
+        args.push("--summary".into());
+    }
+    if opts.layout != Layout::Package {
+        args.push("--layout".into());
+        args.push(layout_name(opts.layout).into());
+    }
+    if opts.explicit_book_root {
+        args.push("--book-root".into());
+        args.push(opts.book_root.clone());
+    }
+    if let Some(book) = &opts.book {
+        args.push("--book".into());
+        args.push(book.clone());
+    }
+    if opts.explicit_markdown_root {
+        args.push("--markdown-root".into());
+        args.push(opts.markdown_root.clone());
+    }
+    if opts.explicit_summary_path {
+        args.push("--summary-path".into());
+        args.push(opts.summary_path.clone());
+    }
+    if let Some(title) = &opts.title {
+        args.push("--title".into());
+        args.push(title.clone());
+    }
+    if !opts.ignore_git {
+        args.push("--ignore".into());
+        args.push("none".into());
+    }
+    if opts.no_proto_highlight {
+        args.push("--no-proto-highlight".into());
+    }
+    if opts.no_cel_highlight {
+        args.push("--no-cel-highlight".into());
+    }
+    if opts.no_proto_markdown {
+        args.push("--no-proto-markdown".into());
+    }
+    match opts.escape_tags {
+        EscapeTags::Off => {}
+        EscapeTags::Backticks => args.push("--escape-tags".into()),
+        EscapeTags::Entities => {
+            args.push("--escape-tags".into());
+            args.push("entities".into());
+        }
+    }
+    args
+}
+
+/// Parse a protoc-style option string and emit equivalent CLI argv tokens.
+pub fn parameter_to_cli_args(param: &str) -> Result<Vec<String>> {
+    let opts = parse_parameter(&Some(param.to_string()))?;
+    Ok(options_to_cli_args(&opts))
+}
+
+fn layout_name(layout: Layout) -> &'static str {
+    match layout {
+        Layout::Package => "package",
+        Layout::Entity => "entity",
+        Layout::Split => "split",
     }
 }
 
@@ -390,5 +533,46 @@ mod tests {
     fn unknown_escape_tags_value_errors() {
         let err = parse_parameter(&Some("escape_tags=foo".into())).unwrap_err();
         assert!(format!("{err:#}").contains("escape_tags"));
+    }
+
+    #[test]
+    fn parameter_to_cli_args_round_trip() {
+        let param = "init,layout=entity,title=My Book,no_proto_highlight";
+        let args = parameter_to_cli_args(param).unwrap();
+        assert!(args.contains(&"--init".to_string()));
+        assert!(args.contains(&"--layout".to_string()));
+        assert!(args.contains(&"entity".to_string()));
+        assert!(args.contains(&"--title".to_string()));
+        assert!(args.contains(&"My Book".to_string()));
+        assert!(args.contains(&"--no-proto-highlight".to_string()));
+    }
+
+    #[test]
+    fn options_to_cli_args_escape_tags_entities() {
+        let opts = parse_parameter(&Some("escape_tags=entities".into())).unwrap();
+        let args = options_to_cli_args(&opts);
+        assert_eq!(args, vec!["--escape-tags", "entities"]);
+    }
+
+    #[test]
+    fn build_options_from_cli_matches_parse_parameter() {
+        let input = CliOptionsInput {
+            summary: true,
+            layout: Layout::Entity,
+            markdown_root: Some("content/api".into()),
+            ..CliOptionsInput::default()
+        };
+        let from_cli = build_options_from_cli(input).unwrap();
+        let from_param = parse_parameter(&Some(
+            "summary,layout=entity,markdown_root=content/api".into(),
+        ))
+        .unwrap();
+        assert_eq!(from_cli.summary, from_param.summary);
+        assert_eq!(from_cli.layout, from_param.layout);
+        assert_eq!(from_cli.markdown_root, from_param.markdown_root);
+        assert_eq!(
+            from_cli.explicit_markdown_root,
+            from_param.explicit_markdown_root
+        );
     }
 }
