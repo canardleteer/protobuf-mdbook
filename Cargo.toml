@@ -15,6 +15,11 @@ description = "protobuf-mdbook CLI and protoc-gen-mdbook plugin: schema document
 keywords = ["protoc", "protobuf", "mdbook", "markdown", "documentation"]
 categories = ["development-tools", "command-line-utilities"]
 
+# CI / Pages toolchain pins (mdbook CLI matches mdbook-core below).
+[workspace.metadata.protobuf-mdbook.toolchain]
+buf = "1.69.0"
+mdbook-mermaid = "0.17.0"
+
 [workspace.dependencies]
 anyhow = "1.0"
 buffa = { version = "0.6.0", default-features = false, features = ["std"] }

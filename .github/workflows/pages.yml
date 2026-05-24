@@ -24,30 +24,35 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install Rust toolchain
-        uses: dsherret/rust-toolchain-file@v1
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Read toolchain versions from Cargo.toml
+        uses: ./.github/actions/toolchain-versions
 
       - name: Cache Cargo registry and git
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            .
-            xtask
+          # Single workspace at repo root; default ". -> target" is correct.
+          # shared-key lets ci/docker/pages reuse deps on the same host triple.
+          shared-key: cargo
           cache-on-failure: true
+          # Don't cache ~/.cargo/bin: rust-cache may strip binaries while
+          # .crates2.json still marks cargo-install tools as present.
+          cache-bin: false
 
-      - name: Install Buf CLI
-        run: cargo install buf-toolchain --locked --version 1.69.0
+      - name: Install toolchain CLI
+        uses: ./.github/actions/install-toolchain
+        with:
+          mdbook: true
+          mdbook-mermaid: true
 
       - name: Generate example mdBook at ./api-book
         run: cargo xtask book-init
 
       - name: Check generated markdown links
         run: cargo xtask book-links
-
-      - name: Install mdBook (pinned to plugin)
-        run: cargo install mdbook --version 0.5.3 --locked
-
-      - name: Install mdbook-mermaid
-        run: cargo install mdbook-mermaid --locked
 
       - name: Configure Mermaid preprocessor
         run: mdbook-mermaid install api-book
@@ -60,7 +65,7 @@ jobs:
         run: mdbook build api-book
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: api-book/book
 
@@ -74,4 +79,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

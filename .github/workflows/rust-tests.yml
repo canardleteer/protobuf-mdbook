@@ -37,9 +37,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Install Rust toolchain
-        uses: dsherret/rust-toolchain-file@v1
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - name: Read toolchain versions from Cargo.toml
+        uses: ./.github/actions/toolchain-versions
+      - name: Cache Cargo registry and git
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Single workspace at repo root; default ". -> target" is correct.
+          # shared-key lets ci/docker/pages reuse deps on the same host triple.
+          shared-key: cargo
+          cache-on-failure: true
+          # Don't cache ~/.cargo/bin: rust-cache may strip binaries while
+          # .crates2.json still marks cargo-install tools as present.
+          cache-bin: false
       - name: Install Buf CLI
-        run: cargo install buf-toolchain --locked --version 1.69.0
+        uses: ./.github/actions/install-toolchain
       - name: cargo xtask ci
         run: cargo xtask ci
 
@@ -49,7 +63,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Install Rust toolchain
-        uses: dsherret/rust-toolchain-file@v1
-      - uses: docker/setup-buildx-action@v3
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - name: Cache Cargo registry and git
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Single workspace at repo root; default ". -> target" is correct.
+          # shared-key lets ci/docker/pages reuse deps on the same host triple.
+          shared-key: cargo
+          cache-on-failure: true
+          cache-bin: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
       - name: docker build and smoke test
         run: cargo xtask docker

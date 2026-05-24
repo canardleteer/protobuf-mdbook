@@ -1,8 +1,7 @@
 # protobuf-mdbook & protoc-gen-mdbook
 
 > [!WARNING]
-> Clanker generated code, running an auto-release pipeline on auto-pilot from an
-> external release trigger.
+> Clanker generated code, running an auto-release pipeline.
 >
 > Decide if that degree of automation is appropriate for your requirements.
 

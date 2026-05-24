@@ -1,0 +1,35 @@
+# Read buf, mdbook, and mdbook-mermaid pins from root Cargo.toml into GITHUB_ENV.
+name: Read toolchain versions
+description: Export toolchain version pins from Cargo.toml for CI install steps
+
+runs:
+  using: composite
+  steps:
+    - name: Read pins from Cargo.toml
+      shell: bash
+      run: |
+        set -euo pipefail
+        metadata=$(cargo metadata --format-version=1 --no-deps)
+        buf_version=$(echo "$metadata" | jq -r '.metadata."protobuf-mdbook".toolchain.buf')
+        mdbook_mermaid_version=$(echo "$metadata" | jq -r '.metadata."protobuf-mdbook".toolchain."mdbook-mermaid"')
+        mdbook_version=$(echo "$metadata" | jq -r '
+          .packages[] | select(.name == "protobuf-mdbook") |
+          .dependencies[] | select(.name == "mdbook-core") | .req' | sed 's/^=//')
+        if [[ -z "$buf_version" || "$buf_version" == "null" ]]; then
+          echo "missing workspace.metadata.protobuf-mdbook.toolchain.buf in Cargo.toml" >&2
+          exit 1
+        fi
+        if [[ -z "$mdbook_mermaid_version" || "$mdbook_mermaid_version" == "null" ]]; then
+          echo "missing workspace.metadata.protobuf-mdbook.toolchain.mdbook-mermaid in Cargo.toml" >&2
+          exit 1
+        fi
+        if [[ -z "$mdbook_version" || "$mdbook_version" == "null" ]]; then
+          echo "missing mdbook-core pin in root Cargo.toml" >&2
+          exit 1
+        fi
+        {
+          echo "BUF_VERSION=$buf_version"
+          echo "MDBOOK_VERSION=$mdbook_version"
+          echo "MDBOOK_MERMAID_VERSION=$mdbook_mermaid_version"
+        } >> "$GITHUB_ENV"
+        echo "buf=$buf_version mdbook=$mdbook_version mdbook-mermaid=$mdbook_mermaid_version"
