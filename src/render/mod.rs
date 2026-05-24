@@ -33,6 +33,7 @@ pub(crate) fn push_paragraph_break(out: &mut String) {
     out.push('\n');
 }
 
+/// Group `file_to_generate` by package; file order within each package follows request order.
 pub fn packages_map<'a>(
     proto_files: &'a [FileDescriptorProto],
     file_to_generate: &'a [String],
@@ -54,13 +55,31 @@ pub fn packages_map<'a>(
     by_package
 }
 
-pub fn collect_entities_for_package(
-    package: &str,
+/// Visit entities in link/SUMMARY order: files vec order, then message/enum/service descriptor order.
+pub fn for_each_entity_in_files(
     files: &[(&str, &FileDescriptorProto)],
-) -> Vec<EntityRef> {
-    collect_entities(package, files)
+    mut f: impl FnMut(EntityKind, &str, &str, &FileDescriptorProto, usize),
+) {
+    for (proto_name, file) in files {
+        for (i, msg) in file.message_type.iter().enumerate() {
+            if let Some(name) = msg.name.as_deref() {
+                f(EntityKind::Message, name, proto_name, file, i);
+            }
+        }
+        for (i, en) in file.enum_type.iter().enumerate() {
+            if let Some(name) = en.name.as_deref() {
+                f(EntityKind::Enum, name, proto_name, file, i);
+            }
+        }
+        for (i, svc) in file.service.iter().enumerate() {
+            if let Some(name) = svc.name.as_deref() {
+                f(EntityKind::Service, name, proto_name, file, i);
+            }
+        }
+    }
 }
 
+/// Build cross-reference paths for all entities in `by_package`.
 pub fn build_link_context(
     by_package: &BTreeMap<String, Vec<(&str, &FileDescriptorProto)>>,
     opts: &Options,
@@ -72,17 +91,15 @@ pub fn build_link_context(
     LinkContext::new(opts.layout, &opts.book_root, &opts.markdown_root, entities)
 }
 
+/// Render package or entity markdown for every package in `by_package` (BTreeMap key order).
 pub fn render_all(
-    proto_files: &[FileDescriptorProto],
-    file_to_generate: &[String],
+    by_package: &BTreeMap<String, Vec<(&str, &FileDescriptorProto)>>,
     opts: &Options,
     links: &LinkContext,
     source: &mut source::SourceCache,
 ) -> Vec<GeneratedDoc> {
-    let by_package = packages_map(proto_files, file_to_generate);
-
     let mut docs = Vec::new();
-    for (package, files) in &by_package {
+    for (package, files) in by_package {
         if package.is_empty() {
             continue;
         }
@@ -92,16 +109,9 @@ pub fn render_all(
                     package::render_package_page(package, files, links, opts, source);
                 docs.push(GeneratedDoc { path, content });
             }
-            Layout::Entity => {
+            Layout::Entity | Layout::Split => {
                 for (path, content) in
-                    entity::render_entity_pages(package, files, links, opts, false, source)
-                {
-                    docs.push(GeneratedDoc { path, content });
-                }
-            }
-            Layout::Split => {
-                for (path, content) in
-                    entity::render_entity_pages(package, files, links, opts, true, source)
+                    entity::render_entity_pages(package, files, links, opts, source)
                 {
                     docs.push(GeneratedDoc { path, content });
                 }
@@ -112,39 +122,49 @@ pub fn render_all(
     docs
 }
 
+/// Collect entity refs for one package in link/SUMMARY order.
 pub(crate) fn collect_entities(
     package: &str,
     files: &[(&str, &FileDescriptorProto)],
 ) -> Vec<EntityRef> {
     let mut out = Vec::new();
-    for (_, file) in files {
-        for msg in &file.message_type {
-            if let Some(name) = &msg.name {
-                out.push(EntityRef {
-                    package: package.to_string(),
-                    kind: EntityKind::Message,
-                    name: name.clone(),
-                });
-            }
-        }
-        for en in &file.enum_type {
-            if let Some(name) = &en.name {
-                out.push(EntityRef {
-                    package: package.to_string(),
-                    kind: EntityKind::Enum,
-                    name: name.clone(),
-                });
-            }
-        }
-        for svc in &file.service {
-            if let Some(name) = &svc.name {
-                out.push(EntityRef {
-                    package: package.to_string(),
-                    kind: EntityKind::Service,
-                    name: name.clone(),
-                });
-            }
+    for_each_entity_in_files(files, |kind, name, _, _, _| {
+        out.push(EntityRef {
+            package: package.to_string(),
+            kind,
+            name: name.to_string(),
+        });
+    });
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file(name: &str, package: &str) -> FileDescriptorProto {
+        FileDescriptorProto {
+            name: Some(name.into()),
+            package: Some(package.into()),
+            ..Default::default()
         }
     }
-    out
+
+    #[test]
+    fn packages_map_preserves_file_to_generate_order_within_package() {
+        let a = file("pkg/a.proto", "acme.v1");
+        let b = file("pkg/b.proto", "acme.v1");
+        let proto_files = vec![a.clone(), b.clone()];
+
+        let forward_inputs = ["pkg/a.proto".into(), "pkg/b.proto".into()];
+        let forward = packages_map(&proto_files, &forward_inputs);
+        let reverse_inputs = ["pkg/b.proto".into(), "pkg/a.proto".into()];
+        let reverse = packages_map(&proto_files, &reverse_inputs);
+
+        let forward_names: Vec<_> = forward["acme.v1"].iter().map(|(n, _)| *n).collect();
+        let reverse_names: Vec<_> = reverse["acme.v1"].iter().map(|(n, _)| *n).collect();
+
+        assert_eq!(forward_names, ["pkg/a.proto", "pkg/b.proto"]);
+        assert_eq!(reverse_names, ["pkg/b.proto", "pkg/a.proto"]);
+    }
 }

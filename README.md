@@ -241,7 +241,6 @@ accept the same string in `request.parameter`.
 | `summary_path=<path>` | both | SUMMARY when `summary`/`init` (default `src/SUMMARY.md`, or `{src}/SUMMARY.md` with `book=`) |
 | `proto_path=<dir>` \| `dir:a:dir:b` | both | Search path(s) for `.proto` sources |
 | `title=<text>` | init only | `book.toml` title (default **Protobuf documentation** if omitted) |
-| `theme` | init only | Redundant with default init behavior (theme always copied) |
 | `ignore=git` \| `ignore=none` | init only | Whether init emits `.gitignore` (default `ignore=git`) |
 | `no_proto_highlight` | init only | Skip protobuf Highlight.js grammar in `theme/index.hbs` (default: on) |
 | `no_cel_highlight` | init only | Skip CEL Highlight.js grammar in `theme/index.hbs` (default: on; independent of protobuf) |
@@ -417,6 +416,16 @@ via BSR dep in [`buf.yaml`](examples/proto/buf.yaml)). **`--generator protoc`**
 / tests run `buf export` to `target/proto-deps/` for `protoc -I` — do not pass
 exported `.proto` files as protoc inputs. Generated book: `./api-book/`
 (gitignored).
+
+**Canonical protoc inputs:** [`src/examples.rs`](src/examples.rs) defines
+`protobuf_mdbook::examples::EXAMPLE_PROTO_INPUTS` — the eight `acme/example/…`
+files used by **`cargo xtask book-*`**, integration tests, and link-check runs.
+That list matches the shell globs in the protoc walkthrough above and **excludes**
+`buf/validate/validate.proto` (import-only via `buf export`). When you add a
+new fixture `.proto` under `acme/`, append its path relative to `examples/proto/`
+to `EXAMPLE_PROTO_INPUTS`. **`protobuf-mdbook examples/proto`** (Buf module root)
+still discovers module protos via Buf; only the explicit protoc / xtask / test paths
+use the shared list.
 
 ### Contributing
 

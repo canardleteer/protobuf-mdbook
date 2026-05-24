@@ -16,6 +16,17 @@ pub struct CompanionDoc {
     /// Source directory relative to corpus root (`acme/example/v1`).
     pub source_dir: PathBuf,
     pub stem: String,
+    /// Absolute path resolved at discovery (used when copying bytes).
+    pub source_path: PathBuf,
+}
+
+/// Search roots for companion discovery; defaults to `"."` when opts list is empty.
+fn search_roots(opts: &Options) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = opts.proto_search_paths().collect();
+    if roots.is_empty() {
+        roots.push(PathBuf::from("."));
+    }
+    roots
 }
 
 /// Discover companion markdown for `file_to_generate` protos.
@@ -28,11 +39,8 @@ pub fn discover_companion_docs(
         return Ok(Vec::new());
     }
 
-    let mut search_roots: Vec<PathBuf> = opts.proto_search_paths().collect();
-    if search_roots.is_empty() {
-        search_roots.push(PathBuf::from("."));
-    }
-    let proto_dirs = collect_proto_dirs(proto_files, file_to_generate, &search_roots)?;
+    let roots = search_roots(opts);
+    let proto_dirs = collect_proto_dirs(proto_files, file_to_generate, &roots)?;
     if proto_dirs.is_empty() {
         return Ok(Vec::new());
     }
@@ -43,7 +51,7 @@ pub fn discover_companion_docs(
         let mut dir = proto_dir.clone();
         loop {
             if !dir.as_os_str().is_empty() {
-                collect_md_in_dir(&dir, opts, &mut seen)?;
+                collect_md_in_dir(&dir, &roots, &mut seen)?;
             }
             if dir.as_os_str().is_empty() {
                 break;
@@ -62,15 +70,10 @@ pub fn read_companion_files(
     docs: &[CompanionDoc],
     opts: &Options,
 ) -> Result<Vec<(String, String)>> {
-    let mut search_roots: Vec<PathBuf> = opts.proto_search_paths().collect();
-    if search_roots.is_empty() {
-        search_roots.push(PathBuf::from("."));
-    }
     let mut out = Vec::with_capacity(docs.len());
     for doc in docs {
-        let source_path = resolve_source_path(&doc.source_dir, &doc.stem, &search_roots)?;
-        let content = std::fs::read_to_string(&source_path)
-            .with_context(|| format!("read companion markdown {}", source_path.display()))?;
+        let content = std::fs::read_to_string(&doc.source_path)
+            .with_context(|| format!("read companion markdown {}", doc.source_path.display()))?;
         let path = opts.output_path(&format!("{}/{}", opts.markdown_root, doc.output_rel));
         out.push((path, content));
     }
@@ -121,13 +124,9 @@ fn normalize_rel_dir(path: &Path) -> PathBuf {
 
 fn collect_md_in_dir(
     dir: &Path,
-    opts: &Options,
+    search_roots: &[PathBuf],
     seen: &mut BTreeMap<String, CompanionDoc>,
 ) -> Result<()> {
-    let mut search_roots: Vec<PathBuf> = opts.proto_search_paths().collect();
-    if search_roots.is_empty() {
-        search_roots.push(PathBuf::from("."));
-    }
     let fs_dir = search_roots
         .iter()
         .map(|r| r.join(dir))
@@ -165,6 +164,7 @@ fn collect_md_in_dir(
                 title,
                 source_dir: rel_dir,
                 stem: stem.to_string(),
+                source_path: path,
             },
         );
     }
@@ -194,20 +194,6 @@ pub fn companion_output_name(rel_dir: &Path, stem: &str) -> String {
     } else {
         format!("{dot_path}.{stem}.md")
     }
-}
-
-fn resolve_source_path(source_dir: &Path, stem: &str, search_roots: &[PathBuf]) -> Result<PathBuf> {
-    for root in search_roots {
-        let path = root.join(source_dir).join(format!("{stem}.md"));
-        if path.is_file() {
-            return Ok(path);
-        }
-    }
-    anyhow::bail!(
-        "companion markdown not found for {}/{}.md on proto_path",
-        source_dir.display(),
-        stem
-    )
 }
 
 fn title_from_markdown(stem: &str, content: &str) -> String {

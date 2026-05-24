@@ -97,6 +97,9 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
   `proto_deps::ensure_proto_deps_export` writes gitignored `target/proto-deps/` for protoc
   `-I` only — never pass exported files as inputs (`cargo xtask book-*` and link-check tests
   call it automatically).
+- **Canonical protoc inputs:** [`src/examples.rs`](src/examples.rs) (`EXAMPLE_PROTO_INPUTS`) —
+  shared by `cargo xtask book-*`, integration tests, and link-check; excludes exported
+  `buf/validate/validate.proto`. Update the list when adding fixture protos under `acme/`.
 - Generated book at `./api-book/` (gitignored): CI runs `cargo xtask book-init --markdown-only` then `book-links`; local preview uses `book-init` once, then `book-refresh`. Guided tasks accept `--generator protoc` (default, CI) or `--generator cli` (`protobuf-mdbook` + Buf on `examples/proto/`).
 
 ## Output conventions

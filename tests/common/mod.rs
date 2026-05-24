@@ -5,16 +5,7 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-pub const EXAMPLE_PROTO_INPUTS: &[&str] = &[
-    "acme/example/v1/echo.proto",
-    "acme/example/v1/gateway.proto",
-    "acme/example/v2/types.proto",
-    "acme/example/v2/catalog.proto",
-    "acme/example/v2/services.proto",
-    "acme/example/v3alpha1/types.proto",
-    "acme/example/v3alpha1/pipeline.proto",
-    "acme/example/v3alpha1/services.proto",
-];
+pub const EXAMPLE_PROTO_INPUTS: &[&str] = protobuf_mdbook::examples::EXAMPLE_PROTO_INPUTS;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Backend {
@@ -27,7 +18,7 @@ pub fn manifest_dir() -> PathBuf {
 }
 
 pub fn examples_proto_dir() -> PathBuf {
-    manifest_dir().join("examples/proto")
+    protobuf_mdbook::examples::examples_proto_dir()
 }
 
 pub fn fixtures_dir() -> PathBuf {
@@ -87,11 +78,7 @@ fn run_protoc_examples_in(out: &Path, layout: &str, extra_opt: &str) {
     let proto_dir = examples_proto_dir();
     let deps = ensure_proto_deps_export();
 
-    let mut opt = format!("layout={layout},proto_path=.");
-    if !extra_opt.is_empty() {
-        opt.push(',');
-        opt.push_str(extra_opt);
-    }
+    let opt = protobuf_mdbook::examples::format_examples_mdbook_opt(layout, extra_opt);
 
     let mut cmd = Command::new(protoc);
     cmd.current_dir(&proto_dir)
@@ -113,11 +100,7 @@ fn run_cli_examples_in(out: &Path, layout: &str, extra_opt: &str) {
     let cli: PathBuf = env!("CARGO_BIN_EXE_protobuf-mdbook").into();
     let proto_dir = examples_proto_dir();
 
-    let mut opt = format!("layout={layout},proto_path=.");
-    if !extra_opt.is_empty() {
-        opt.push(',');
-        opt.push_str(extra_opt);
-    }
+    let opt = protobuf_mdbook::examples::format_examples_mdbook_opt(layout, extra_opt);
 
     let mut cmd = Command::new(cli);
     cmd.current_dir(&proto_dir)

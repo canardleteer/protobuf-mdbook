@@ -44,25 +44,13 @@ pub struct ResolvedInput {
 }
 
 impl ResolvedInput {
+    /// Build generation input; CLI search roots travel on the struct, not in `parameter`.
     pub fn into_generate_input(self, parameter: Option<String>) -> GenerateInput {
-        let mut param = parameter.unwrap_or_default();
-        if !self.proto_search_paths.is_empty() {
-            let paths = self
-                .proto_search_paths
-                .iter()
-                .map(|p| p.to_string_lossy().into_owned())
-                .collect::<Vec<_>>()
-                .join(":");
-            if param.is_empty() {
-                param = format!("proto_path={paths}");
-            } else {
-                param.push_str(&format!(",proto_path={paths}"));
-            }
-        }
         GenerateInput {
             proto_file: self.proto_file,
             file_to_generate: self.file_to_generate,
-            parameter: if param.is_empty() { None } else { Some(param) },
+            parameter,
+            proto_search_paths: self.proto_search_paths,
         }
     }
 }
@@ -184,24 +172,18 @@ fn compile_with_buf(args: &ResolveArgs) -> Result<ResolvedInput> {
     })?;
 
     let buf = resolve_buf_path(args.buf_path.as_deref())?;
-    let fds_path = tempfile::Builder::new()
-        .prefix("protobuf-mdbook-")
-        .suffix(".binpb")
-        .tempfile()
-        .context("create temp descriptor set")?;
-    let fds_path = fds_path.path().to_path_buf();
-
-    let status = Command::new(&buf)
-        .current_dir(&module_root)
-        .args(["build", "-o"])
-        .arg(&fds_path)
-        .status()
-        .with_context(|| format!("spawn {}", buf.display()))?;
-    if !status.success() {
-        bail!("buf build failed in {}", module_root.display());
-    }
-
-    let (proto_file, _) = load_descriptor_set(&fds_path)?;
+    let proto_file = compile_to_fds(|fds_path| {
+        let status = Command::new(&buf)
+            .current_dir(&module_root)
+            .args(["build", "-o"])
+            .arg(fds_path)
+            .status()
+            .with_context(|| format!("spawn {}", buf.display()))?;
+        if !status.success() {
+            bail!("buf build failed in {}", module_root.display());
+        }
+        Ok(())
+    })?;
     let file_to_generate =
         resolve_file_to_generate_for_inputs(&module_root, &args.inputs, &proto_file)?;
 
@@ -243,32 +225,26 @@ fn compile_with_protoc(args: &ResolveArgs) -> Result<ResolvedInput> {
     }
 
     let protoc = resolve_protoc_path(args.protoc_path.as_deref())?;
-    let fds_path = tempfile::Builder::new()
-        .prefix("protobuf-mdbook-")
-        .suffix(".binpb")
-        .tempfile()
-        .context("create temp descriptor set")?;
-    let fds_path = fds_path.path().to_path_buf();
+    let proto_file = compile_to_fds(|fds_path| {
+        let mut cmd = Command::new(&protoc);
+        cmd.arg("--descriptor_set_out").arg(fds_path);
+        cmd.arg("--include_imports");
+        cmd.arg("--include_source_info");
+        for inc in &include_paths {
+            cmd.arg("-I").arg(inc);
+        }
+        for (protoc_arg, _) in &protoc_inputs {
+            cmd.arg(protoc_arg);
+        }
 
-    let mut cmd = Command::new(&protoc);
-    cmd.arg("--descriptor_set_out").arg(&fds_path);
-    cmd.arg("--include_imports");
-    cmd.arg("--include_source_info");
-    for inc in &include_paths {
-        cmd.arg("-I").arg(inc);
-    }
-    for (protoc_arg, _) in &protoc_inputs {
-        cmd.arg(protoc_arg);
-    }
-
-    let status = cmd
-        .status()
-        .with_context(|| format!("spawn {}", protoc.display()))?;
-    if !status.success() {
-        bail!("protoc failed");
-    }
-
-    let (proto_file, _) = load_descriptor_set(&fds_path)?;
+        let status = cmd
+            .status()
+            .with_context(|| format!("spawn {}", protoc.display()))?;
+        if !status.success() {
+            bail!("protoc failed");
+        }
+        Ok(())
+    })?;
     let file_to_generate: Vec<String> = protoc_inputs.into_iter().map(|(_, name)| name).collect();
 
     Ok(ResolvedInput {
@@ -276,6 +252,19 @@ fn compile_with_protoc(args: &ResolveArgs) -> Result<ResolvedInput> {
         file_to_generate,
         proto_search_paths: include_paths,
     })
+}
+
+/// Run `runner` to write a descriptor set, then load protobuf files from it.
+fn compile_to_fds(runner: impl FnOnce(&Path) -> Result<()>) -> Result<Vec<FileDescriptorProto>> {
+    let fds_file = tempfile::Builder::new()
+        .prefix("protobuf-mdbook-")
+        .suffix(".binpb")
+        .tempfile()
+        .context("create temp descriptor set")?;
+    let fds_path = fds_file.path();
+    runner(fds_path)?;
+    let (proto_file, _) = load_descriptor_set(fds_path)?;
+    Ok(proto_file)
 }
 
 fn find_buf_module_root(start: &Path) -> Result<Option<PathBuf>> {

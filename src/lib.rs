@@ -5,6 +5,7 @@
 mod plugin_api;
 
 pub mod book_config;
+pub mod examples;
 pub mod init;
 pub mod input;
 pub mod link_check;
@@ -21,7 +22,7 @@ use anyhow::{Context, Result, bail};
 use buffa::Message;
 use options::parse_parameter;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::book_config::apply_book_config;
 
@@ -31,6 +32,8 @@ pub struct GenerateInput {
     pub proto_file: Vec<FileDescriptorProto>,
     pub file_to_generate: Vec<String>,
     pub parameter: Option<String>,
+    /// CLI-resolved search roots; protoc plugin leaves empty and uses `proto_path=` in parameter.
+    pub proto_search_paths: Vec<PathBuf>,
 }
 
 impl From<CodeGeneratorRequest> for GenerateInput {
@@ -39,6 +42,7 @@ impl From<CodeGeneratorRequest> for GenerateInput {
             proto_file: req.proto_file,
             file_to_generate: req.file_to_generate,
             parameter: req.parameter,
+            proto_search_paths: Vec::new(),
         }
     }
 }
@@ -56,17 +60,14 @@ pub fn generate_from_input(input: &GenerateInput) -> Result<Vec<(String, String)
 
     let mut opts = parse_parameter(&input.parameter)?;
     apply_book_config(&mut opts)?;
+    if !input.proto_search_paths.is_empty() {
+        opts.proto_search_path = input.proto_search_paths.clone();
+    }
 
     let by_package = render::packages_map(&input.proto_file, &input.file_to_generate);
     let links = render::build_link_context(&by_package, &opts);
     let mut source = render::source::SourceCache::new(opts.proto_search_paths());
-    let docs = render::render_all(
-        &input.proto_file,
-        &input.file_to_generate,
-        &opts,
-        &links,
-        &mut source,
-    );
+    let docs = render::render_all(&by_package, &opts, &links, &mut source);
 
     let mut file_map: HashMap<String, String> = HashMap::new();
     for doc in &docs {
@@ -79,13 +80,8 @@ pub fn generate_from_input(input: &GenerateInput) -> Result<Vec<(String, String)
         file_map.insert(path, content);
     }
 
-    if let Some((path, content)) = summary::render_summary(
-        &input.proto_file,
-        &input.file_to_generate,
-        &opts,
-        &links,
-        &companions,
-    ) {
+    if let Some((path, content)) = summary::render_summary(&by_package, &opts, &links, &companions)
+    {
         file_map.insert(path, content);
     }
 

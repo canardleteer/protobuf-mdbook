@@ -25,3 +25,11 @@ protoc -I . -I ../../target/proto-deps …
 ```
 
 Format locally with `cargo xtask fmt` (`buf format -w` on this directory).
+
+## Protoc and xtask inputs
+
+Integration tests, `cargo xtask book-*`, and the root README protoc walkthrough
+document the same eight `acme/example/…` `.proto` files. The authoritative list is
+[`src/examples.rs`](../../src/examples.rs) (`EXAMPLE_PROTO_INPUTS`); it excludes
+`buf/validate/validate.proto` (use only on `-I` from export). Add new fixture protos
+there when extending this module.

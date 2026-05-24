@@ -1,7 +1,8 @@
 //! Render `mdbook_summary::Summary` to SUMMARY.md markdown.
 
+use crate::render::links::relative_path_from_dir;
 use mdbook_summary::{Link, Summary, SummaryItem};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Bullet levels below the H1 title.
 pub const SUMMARY_MAX_DEPTH: usize = 4;
@@ -70,35 +71,41 @@ pub fn validate_summary_warn(text: &str) {
 
 /// Relative link path from `summary_path` to `target` under markdown_root/book layout.
 pub fn link_path_for_summary(summary_from: &Path, target: &Path) -> PathBuf {
-    use std::path::PathBuf;
     let from_dir = summary_from.parent().unwrap_or(Path::new(""));
-    let from_parts: Vec<_> = from_dir.components().collect();
-    let target_parts: Vec<_> = target.components().collect();
-    let mut i = 0;
-    while i < from_parts.len() && i < target_parts.len() && from_parts[i] == target_parts[i] {
-        i += 1;
-    }
-    let ups = from_parts.len().saturating_sub(i);
-    let mut parts: Vec<String> = (0..ups).map(|_| "..".to_string()).collect();
-    for c in &target_parts[i..] {
-        parts.push(c.as_os_str().to_string_lossy().into_owned());
-    }
-    if parts.is_empty() {
-        target
-            .file_name()
-            .map(|s| PathBuf::from(s.to_string_lossy().into_owned()))
-            .unwrap_or_default()
-    } else {
-        PathBuf::from(parts.join("/"))
-    }
+    PathBuf::from(relative_path_from_dir(from_dir, target))
 }
-
-use std::path::PathBuf;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mdbook_summary::SummaryItem;
+    use mdbook_summary::{SummaryItem, parse_summary};
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct LinkShape {
+        name: String,
+        location: Option<String>,
+        nested: Vec<LinkShape>,
+    }
+
+    fn link_shapes(items: &[SummaryItem]) -> Vec<LinkShape> {
+        items
+            .iter()
+            .filter_map(|item| {
+                if let SummaryItem::Link(link) = item {
+                    Some(LinkShape {
+                        name: link.name.clone(),
+                        location: link
+                            .location
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().into_owned()),
+                        nested: link_shapes(&link.nested_items),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 
     #[test]
     fn rendered_summary_parses() {
@@ -111,5 +118,29 @@ mod tests {
         let md = render_summary_markdown(&summary);
         mdbook_summary::parse_summary(&md).expect("round-trip");
         assert!(md.starts_with("# Book\n"));
+    }
+
+    #[test]
+    fn render_parse_round_trip_preserves_structure() {
+        let mut nested = Link::new("Nested", "src/nested.md");
+        nested
+            .nested_items
+            .push(SummaryItem::Link(Link::new("Deep", "src/deep.md")));
+
+        let mut top = Link::new("Chapter", "src/chapter.md");
+        top.nested_items.push(SummaryItem::Link(nested));
+
+        let mut summary = Summary::default();
+        summary.title = Some("Book title".into());
+        summary.numbered_chapters = vec![SummaryItem::Link(top)];
+
+        let md = render_summary_markdown(&summary);
+        let parsed = parse_summary(&md).expect("parse rendered SUMMARY");
+
+        assert_eq!(parsed.title.as_deref(), Some("Book title"));
+        assert_eq!(
+            link_shapes(&parsed.numbered_chapters),
+            link_shapes(&summary.numbered_chapters)
+        );
     }
 }
