@@ -33,21 +33,7 @@ fn run_cli_raw(args: &[&str]) -> Command {
 /// `--descriptor-set` decodes a protoc-emitted FDS without a live compiler at CLI runtime.
 #[test]
 fn descriptor_set_roundtrip_emits_package_markdown() {
-    let protoc = protoc_bin_vendored::protoc_bin_path().expect("vendored protoc");
-    let fixture_dir = common::fixtures_dir();
-    let fds = tempfile::NamedTempFile::new().expect("temp fds");
-    let status = Command::new(protoc)
-        .args([
-            "-I",
-            fixture_dir.to_str().expect("utf8"),
-            "--descriptor_set_out",
-            fds.path().to_str().expect("utf8"),
-            "--include_imports",
-            "doc_rich.proto",
-        ])
-        .status()
-        .expect("spawn protoc");
-    assert!(status.success(), "protoc descriptor_set_out failed");
+    let fds = common::build_fixture_fds();
 
     let out = tempfile::tempdir().expect("tempdir");
     let status = run_cli(
@@ -118,21 +104,7 @@ fn request_and_inputs_conflict_fails() {
 
 #[test]
 fn request_stdin_roundtrip() {
-    let protoc = protoc_bin_vendored::protoc_bin_path().expect("vendored protoc");
-    let fixture_dir = common::fixtures_dir();
-    let fds = tempfile::NamedTempFile::new().expect("temp fds");
-    let status = Command::new(protoc)
-        .args([
-            "-I",
-            fixture_dir.to_str().expect("utf8"),
-            "--descriptor_set_out",
-            fds.path().to_str().expect("utf8"),
-            "--include_imports",
-            "doc_rich.proto",
-        ])
-        .status()
-        .expect("spawn protoc");
-    assert!(status.success());
+    let fds = common::build_fixture_fds();
 
     let bytes = std::fs::read(fds.path()).expect("read fds");
     let set = FileDescriptorSet::decode_from_slice(&bytes).expect("decode fds");

@@ -1,6 +1,6 @@
 //! Layout-aware paths and cross-reference links.
 
-use crate::options::{Layout, join_book_root};
+use crate::options::Layout;
 use crate::plugin_api::codegen::split_proto_type_name;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -109,10 +109,6 @@ impl LinkContext {
         let rel = relative_path(from_dir, target);
         format!("[{title}]({rel})")
     }
-}
-
-pub fn with_book_root(book_root: &str, path: &Path) -> String {
-    join_book_root(book_root, &path.to_string_lossy())
 }
 
 pub fn package_page_rel(markdown_root: &str, package: &str) -> PathBuf {

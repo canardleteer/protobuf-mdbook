@@ -1,5 +1,6 @@
 //! `SUMMARY.md` navigation for generated documentation.
 
+mod chapters;
 mod nav_tree;
 mod render_md;
 
@@ -7,8 +8,8 @@ use crate::init::DEFAULT_BOOK_TITLE;
 use crate::options::{Layout, Options};
 use crate::plugin_api::FileDescriptorProto;
 use crate::proto_markdown::CompanionDoc;
-use crate::render::for_each_entity_in_files;
-use crate::render::links::{EntityKind, LinkContext};
+use crate::render::links::LinkContext;
+use chapters::flat_package_chapter;
 use nav_tree::{NavInput, PackageAtDir, build_summary, package_rel_dir};
 use render_md::{render_summary_markdown, validate_summary_warn};
 use std::collections::BTreeMap;
@@ -119,63 +120,12 @@ fn build_flat_summary_chapters(
     links: &LinkContext,
     summary_from: &Path,
 ) -> Vec<mdbook_summary::SummaryItem> {
-    let mut chapters = Vec::new();
-    for (package, files) in by_package {
-        match layout {
-            Layout::Package => {
-                let target = links.package_page_rel(package);
-                let path = render_md::link_path_for_summary(summary_from, &target);
-                chapters.push(mdbook_summary::SummaryItem::Link(
-                    mdbook_summary::Link::new(package, path),
-                ));
-            }
-            Layout::Split | Layout::Entity if package_only => {
-                let target = links.package_index_rel(package);
-                let path = render_md::link_path_for_summary(summary_from, &target);
-                chapters.push(mdbook_summary::SummaryItem::Link(
-                    mdbook_summary::Link::new(package, path),
-                ));
-            }
-            Layout::Split => {
-                let target = links.package_index_rel(package);
-                let path = render_md::link_path_for_summary(summary_from, &target);
-                let mut link = mdbook_summary::Link::new(package, path);
-                link.nested_items = entity_summary_items(package, files, links, summary_from);
-                chapters.push(mdbook_summary::SummaryItem::Link(link));
-            }
-            Layout::Entity => {
-                let mut link = mdbook_summary::Link::default();
-                link.name = package.to_string();
-                link.location = None;
-                link.nested_items = entity_summary_items(package, files, links, summary_from);
-                chapters.push(mdbook_summary::SummaryItem::Link(link));
-            }
-        }
-    }
-    chapters
-}
-
-/// Entity sub-links for SUMMARY in link/SUMMARY order.
-pub(crate) fn entity_summary_items(
-    package: &str,
-    files: &[(&str, &FileDescriptorProto)],
-    links: &LinkContext,
-    summary_from: &Path,
-) -> Vec<mdbook_summary::SummaryItem> {
-    let mut out = Vec::new();
-    for_each_entity_in_files(files, |kind, name, _, _, _| {
-        let p = links.entity_path(package, kind, name).expect("entity");
-        let path = render_md::link_path_for_summary(summary_from, p);
-        let title = match kind {
-            EntityKind::Message => format!("Message {name}"),
-            EntityKind::Enum => format!("Enum {name}"),
-            EntityKind::Service => format!("Service {name}"),
-        };
-        out.push(mdbook_summary::SummaryItem::Link(
-            mdbook_summary::Link::new(title, path),
-        ));
-    });
-    out
+    by_package
+        .iter()
+        .map(|(package, files)| {
+            flat_package_chapter(package, files, layout, package_only, links, summary_from)
+        })
+        .collect()
 }
 
 #[cfg(test)]

@@ -10,9 +10,11 @@ pub mod init;
 pub mod input;
 pub mod link_check;
 pub mod options;
+pub mod paths;
 pub mod proto_deps;
 pub mod proto_markdown;
 pub mod render;
+pub mod runner;
 pub mod summary;
 
 use crate::plugin_api::{

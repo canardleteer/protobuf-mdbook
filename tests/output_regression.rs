@@ -1,6 +1,9 @@
 //! Byte-identical output regression against checked-in golden fixtures.
 //!
 //! Refresh baselines: `cargo xtask update-golden`
+//!
+//! Generation uses [`Backend::ProtocPlugin`] only; CLI parity is covered by
+//! mirrored integration tests in `link_check.rs` and `escape_tags.rs`.
 
 mod common;
 
@@ -82,6 +85,10 @@ fn golden_dir() -> PathBuf {
     common::manifest_dir().join("tests/fixtures/golden")
 }
 
+fn normalize_newlines(content: String) -> String {
+    content.replace("\r\n", "\n").replace('\r', "\n")
+}
+
 /// Collect relative path → content for all files under `root`.
 fn collect_tree(root: &Path) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
@@ -101,7 +108,7 @@ fn collect_tree_inner(root: &Path, dir: &Path, out: &mut BTreeMap<String, String
                 .expect("strip_prefix")
                 .to_string_lossy()
                 .replace('\\', "/");
-            let content = fs::read_to_string(&path).expect("read file");
+            let content = normalize_newlines(fs::read_to_string(&path).expect("read file"));
             out.insert(rel, content);
         }
     }

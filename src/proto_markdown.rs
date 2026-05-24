@@ -1,6 +1,7 @@
 //! Discover and copy hand-written `.md` beside included `.proto` files.
 
 use crate::options::Options;
+use crate::paths::normalize_rel_dir;
 use crate::plugin_api::FileDescriptorProto;
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
@@ -111,15 +112,6 @@ fn resolve_proto_dir(rel_dir: &Path, search_roots: &[PathBuf]) -> Option<PathBuf
         }
     }
     Some(normalize_rel_dir(rel_dir))
-}
-
-fn normalize_rel_dir(path: &Path) -> PathBuf {
-    path.components()
-        .filter_map(|c| match c {
-            Component::Normal(s) => Some(s.to_owned()),
-            _ => None,
-        })
-        .collect()
 }
 
 fn collect_md_in_dir(
