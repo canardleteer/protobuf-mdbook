@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # dtolnay/rust-toolchain@1.95.0 pins the compiler (matches rust-toolchain.toml),
+    # not the action release. Dependabot semver-bumps the ref to nonsense like 1.100.0.
+    ignore:
+      - dependency-name: dtolnay/rust-toolchain
     # When `groups` is active, Dependabot opens one combined PR for all
     # matching GitHub Actions updates each week. Comment out the entire
     # `groups:` block below to revert to the default: one PR per action.
@@ -11,3 +15,5 @@ updates:
       github-actions:
         patterns:
           - "*"
+        exclude-patterns:
+          - dtolnay/rust-toolchain
