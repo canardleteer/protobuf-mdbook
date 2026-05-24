@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # When `groups` is active, Dependabot opens one combined PR for all
+    # matching GitHub Actions updates each week. Comment out the entire
+    # `groups:` block below to revert to the default: one PR per action.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
