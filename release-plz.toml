@@ -5,3 +5,4 @@ pr_labels = ["release"]
 [[package]]
 name = "protobuf-mdbook-xtask"
 release = false
+publish = false
