@@ -6,6 +6,7 @@ mod plugin_api;
 
 pub mod book_config;
 pub mod examples;
+pub mod highlight;
 pub mod init;
 pub mod input;
 pub mod link_check;

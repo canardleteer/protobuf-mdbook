@@ -67,24 +67,22 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
 - **Default:** markdown under `markdown_root=` only (default `src/packages/`); optional `summary` writes `summary_path=` without touching mdBook scaffold.
 - Init strips mdBook’s default `src/SUMMARY.md` and `src/chapter_1.md` stubs (and a custom `summary_path=` if set) before merge.
 - Default book title when `title=` is omitted: **Protobuf documentation** (not inferred from package names).
-- **Syntax highlighting (default on `init`):** inlines `assets/highlightjs/protobuf-10.js` and
-  `cel-10.js` into `theme/index.hbs` (plus `theme/highlight-protobuf.js` / `theme/highlight-cel.js`
-  as reference copies). Opt out with `no_proto_highlight` and/or `no_cel_highlight`. Does not modify
-  mdBook’s `highlight.js` / `highlight.css`. User-facing details: root `README.md` **Syntax
-  highlighting**.
-- **CEL fences:** message-level `(buf.validate.message).cel` is split from `protobuf` fences into
-  adjacent ` ```cel ` blocks (`src/render/cel_fence.rs`).
+- **Syntax highlighting (default on `init`):** wires `[preprocessor.protobuf-highlight]`
+  in `book.toml` for **`mdbook-protobuf-highlight`** (build-time HTML; see
+  [`src/highlight/`](src/highlight/)). Opt out with `no_proto_highlight` and/or
+  `no_cel_highlight`. User-facing details: root `README.md` **Syntax highlighting**.
+- **CEL fences:** message-level `(buf.validate.message).cel` is split from `protobuf`
+  fences into adjacent ` ```cel ` blocks at generation time ([`src/render/cel_fence.rs`](src/render/cel_fence.rs))
+  and again at mdbook build for unsplit companion markdown ([`src/highlight/cel_split.rs`](src/highlight/cel_split.rs)).
 
-## Vendored Highlight.js grammars
+## Highlight grammars (reference + CI)
 
-- Files: [`assets/highlightjs/`](assets/highlightjs/) (`protobuf-10.js`, `cel-10.js`, `*.meta.json`,
-  `NOTICE`).
-- Protobuf: BSD-3-Clause (upstream highlight.js 10.1.1). CEL: repo-authored (`cel-10.js`).
-- **When bumping `mdbook-core` / `mdbook-driver`:** read the Highlight.js version header in mdBook’s
-  default `theme/highlight.js`, re-vendor protobuf for that hljs API if the major version changed,
-  update `protobuf-10.meta.json` and `NOTICE`, run `cargo xtask check-highlightjs-vendor`.
-- **`check-highlightjs-vendor`:** validates every `assets/highlightjs/*.meta.json` (vendored hash;
-  upstream curl when `upstream_file_url` is set). Part of `cargo xtask ci`.
+- Reference JS grammars: [`assets/highlightjs/`](assets/highlightjs/) (`protobuf-10.js`,
+  `cel-10.js`, `*.meta.json`, `NOTICE`) — used as the spec when porting rules to Rust.
+- Runtime highlighter: [`src/highlight/`](src/highlight/) (`protobuf.rs`, `cel.rs`).
+- **`check-highlight-rust`:** golden HTML parity in `tests/fixtures/highlight/` (part of
+  `cargo xtask ci`). Refresh with `cargo xtask update-highlight-golden` after intentional
+  grammar edits.
 
 ## Examples and output
 

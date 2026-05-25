@@ -1,0 +1,7 @@
+message NumericRange {
+  int64 min_inclusive = 1;
+  option (buf.validate.message).cel = {
+    id: "numeric_range.min_lte_max"
+    expression: "this.min_inclusive <= this.max_inclusive"
+  };
+}

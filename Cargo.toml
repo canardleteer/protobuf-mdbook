@@ -27,6 +27,11 @@ buffa-descriptor = { version = "0.6.0", default-features = false, features = ["s
 mdbook-core = "=0.5.3"
 mdbook-driver = "=0.5.3"
 mdbook-summary = "=0.5.3"
+mdbook-preprocessor = "=0.5.3"
+pulldown-cmark = "0.13"
+pulldown-cmark-to-cmark = "21"
+regex = "1.11"
+toml_edit = "0.25"
 tempfile = "3.19"
 walkdir = "2.5"
 protoc-bin-vendored = "3.2.0"
@@ -59,6 +64,10 @@ path = "src/main.rs"
 name = "protobuf-mdbook"
 path = "src/bin/protobuf-mdbook.rs"
 
+[[bin]]
+name = "mdbook-protobuf-highlight"
+path = "src/bin/mdbook-protobuf-highlight.rs"
+
 [dependencies]
 anyhow.workspace = true
 buffa.workspace = true
@@ -67,6 +76,12 @@ clap.workspace = true
 mdbook-core.workspace = true
 mdbook-driver.workspace = true
 mdbook-summary.workspace = true
+mdbook-preprocessor.workspace = true
+pulldown-cmark.workspace = true
+pulldown-cmark-to-cmark.workspace = true
+regex.workspace = true
+toml_edit.workspace = true
+serde_json.workspace = true
 protoc-bin-vendored.workspace = true
 tempfile.workspace = true
 walkdir.workspace = true

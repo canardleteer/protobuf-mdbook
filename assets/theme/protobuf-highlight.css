@@ -1,0 +1,6 @@
+/* protobuf-mdbook: build-time highlighted fences (token colors only, no HLJS panel). */
+pre.protobuf-mdbook {
+  display: block;
+  overflow-x: auto;
+  padding: 1rem;
+}

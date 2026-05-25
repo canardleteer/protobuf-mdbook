@@ -51,6 +51,9 @@ jobs:
       - name: Generate example mdBook at ./api-book
         run: cargo xtask book-init
 
+      - name: Add release binaries to PATH
+        run: echo "${{ github.workspace }}/target/release" >> "$GITHUB_PATH"
+
       - name: Check generated markdown links
         run: cargo xtask book-links
 
