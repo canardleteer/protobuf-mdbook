@@ -92,12 +92,12 @@ impl Options {
         self.init
     }
 
-    /// Whether init should patch `theme/index.hbs` with inline protobuf Highlight.js grammar.
+    /// Whether init wires protobuf highlighting (`mdbook-protobuf-highlight` in `book.toml`).
     pub fn proto_highlight(&self) -> bool {
         self.init && !self.no_proto_highlight
     }
 
-    /// Whether init should patch `theme/index.hbs` with inline CEL Highlight.js grammar.
+    /// Whether init wires CEL highlighting (`mdbook-protobuf-highlight` in `book.toml`).
     pub fn cel_highlight(&self) -> bool {
         self.init && !self.no_cel_highlight
     }

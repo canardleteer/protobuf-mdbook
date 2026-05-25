@@ -183,11 +183,12 @@ This file was created by **protobuf-mdbook** when you passed `init`. You can edi
    mdbook build
    ```
 
-   The generator reports its pinned mdBook version:
+   All three binaries report the pinned mdBook version:
 
    ```bash
    protobuf-mdbook --version
    # or: protoc-gen-mdbook --version
+   # or: mdbook-protobuf-highlight --version
    ```
 
    Expected pin: **{mdbook_ver}** (also declared in the crate `Cargo.toml`).
