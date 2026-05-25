@@ -10,6 +10,7 @@ protobuf schemas and comments into **mdBook** documentation (or Markdown-only
 trees). **`mdbook-protobuf-highlight`** is a separate mdBook preprocessor that
 highlights `protobuf` / `cel` fences at **`mdbook build`** time.
 
+- [Example Output: `examples/proto`](https://canardleteer.github.io/protobuf-mdbook/)
 - [Developer Documentation](#development)
 
 | Binary | Role | Docs |
@@ -28,13 +29,6 @@ protobuf-mdbook --version           # or -V (includes mdbook pin)
 protoc-gen-mdbook --version         # or -V (includes mdbook pin)
 mdbook-protobuf-highlight --version # or -V (includes mdbook pin)
 ```
-
-## Example documentation
-
-The example book built from [`examples/proto/`](examples/proto/) is published to
-GitHub Pages on each push to `main`:
-
-<https://canardleteer.github.io/protobuf-mdbook/>
 
 ## Install
 
