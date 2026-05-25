@@ -40,7 +40,6 @@ impl Preprocessor for ProtobufHighlight {
 
 fn make_app() -> Command {
     Command::new(PREPROCESSOR_COMMAND)
-        .version(env!("CARGO_PKG_VERSION"))
         .about("mdBook preprocessor for build-time protobuf and CEL highlighting")
         .subcommand(
             Command::new("supports")
@@ -57,6 +56,16 @@ fn make_app() -> Command {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!(
+            "mdbook-protobuf-highlight {} (mdbook {})",
+            env!("CARGO_PKG_VERSION"),
+            protobuf_mdbook::mdbook_version()
+        );
+        return;
+    }
+
     let matches = make_app().get_matches();
     if let Some(sub) = matches.subcommand_matches("supports") {
         handle_supports(sub);

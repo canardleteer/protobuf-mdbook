@@ -29,7 +29,6 @@ mdbook-driver = "=0.5.3"
 mdbook-summary = "=0.5.3"
 mdbook-preprocessor = "=0.5.3"
 pulldown-cmark = "0.13"
-pulldown-cmark-to-cmark = "21"
 regex = "1.11"
 toml_edit = "0.25"
 tempfile = "3.19"
@@ -78,7 +77,6 @@ mdbook-driver.workspace = true
 mdbook-summary.workspace = true
 mdbook-preprocessor.workspace = true
 pulldown-cmark.workspace = true
-pulldown-cmark-to-cmark.workspace = true
 regex.workspace = true
 toml_edit.workspace = true
 serde_json.workspace = true

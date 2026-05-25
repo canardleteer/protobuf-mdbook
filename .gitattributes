@@ -1,4 +1,4 @@
-# Vendor grammars are content-addressed (see xtask check-highlightjs-vendor).
+# Vendor grammars are reference specs for Rust highlighter (CI: cargo xtask check-highlight-rust).
 assets/highlightjs/*.js text eol=lf
 assets/highlightjs/*.meta.json text eol=lf
 

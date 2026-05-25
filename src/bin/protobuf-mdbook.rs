@@ -101,11 +101,11 @@ struct Cli {
     #[arg(long, value_enum, default_value_t = IgnoreArg::Git)]
     ignore: IgnoreArg,
 
-    /// Skip protobuf Highlight.js grammar in `theme/index.hbs` (`--init` only).
+    /// Skip protobuf highlighting in init `book.toml` (`--init` only).
     #[arg(long = "no-proto-highlight")]
     no_proto_highlight: bool,
 
-    /// Skip CEL Highlight.js grammar in `theme/index.hbs` (`--init` only).
+    /// Skip CEL highlighting in init `book.toml` (`--init` only).
     #[arg(long = "no-cel-highlight")]
     no_cel_highlight: bool,
 

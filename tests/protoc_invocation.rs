@@ -54,3 +54,19 @@ fn protobuf_mdbook_version_flag_prints_mdbook_pin() {
         "stdout should include pinned mdbook version: {stdout}"
     );
 }
+
+#[test]
+fn mdbook_protobuf_highlight_version_flag_prints_mdbook_pin() {
+    let bin = env!("CARGO_BIN_EXE_mdbook-protobuf-highlight");
+    let out = Command::new(bin)
+        .arg("--version")
+        .output()
+        .expect("spawn mdbook-protobuf-highlight");
+    assert!(out.status.success());
+    let stdout = String::from_utf8(out.stdout).expect("utf8");
+    assert!(stdout.contains("mdbook-protobuf-highlight"));
+    assert!(
+        stdout.contains(protobuf_mdbook::mdbook_version()),
+        "stdout should include pinned mdbook version: {stdout}"
+    );
+}

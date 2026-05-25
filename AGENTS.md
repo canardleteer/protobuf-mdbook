@@ -11,9 +11,9 @@
 ## mdBook version (single source of truth)
 
 - **Pin:** root [`Cargo.toml`](Cargo.toml) `[workspace.dependencies]` entries
-  `mdbook-core` and `mdbook-driver` (keep versions aligned).
-- **Runtime truth:** `protobuf-mdbook --version` and `protoc-gen-mdbook --version` /
-  `-V` print the compiled pin via
+  `mdbook-core`, `mdbook-driver`, and `mdbook-preprocessor` (keep versions aligned).
+- **Runtime truth:** `protobuf-mdbook --version`, `protoc-gen-mdbook --version`, and
+  `mdbook-protobuf-highlight --version` / `-V` print the compiled pin via
   [`mdbook_core::MDBOOK_VERSION`](https://docs.rs/mdbook-core) (exposed as
   `protobuf_mdbook::mdbook_version()` in the library).
 - **Do not** duplicate the mdBook version number in README, AGENTS, or comments —
@@ -31,8 +31,8 @@
 - **SUMMARY:** build `mdbook_summary::Summary` / `Link`, render to markdown, then `parse_summary` —
   **warn on stderr** if parse fails (still emit); unit/integration tests assert parse success on fixtures.
 - **Do not** call `MDBook::load` / `mdbook build` inside the plugin; `xtask` runs `mdbook build` for validation.
-- **No public API** for init README template, protobuf highlight `index.hbs` patch — string patch after
-  `BookBuilder` is acceptable (documented in [`src/init.rs`](src/init.rs)).
+- **No public API** for init README template or highlight `book.toml` / `theme/protobuf-highlight.css`
+  wiring — string edits after `BookBuilder` are acceptable (documented in [`src/init.rs`](src/init.rs)).
 
 | Area | Verdict | Action |
 |------|---------|--------|
@@ -40,7 +40,7 @@
 | `Config::from_disk` | OK | None |
 | SUMMARY | `mdbook-summary` tree + emitter | `parse_summary` warn-only at runtime |
 | `heading_slug` | `mdbook-html::utils::id_from_content` is crate-private | Local shim + parity test on bump |
-| Init README / `index.hbs` | No API | Keep string patch |
+| Init README / highlight theme | No API | `book.toml` preprocessor + `theme/protobuf-highlight.css` via [`src/highlight/book_toml.rs`](src/highlight/book_toml.rs) |
 | Proto API pages | Plugin domain | Hand-written render |
 
 ## Companion proto markdown

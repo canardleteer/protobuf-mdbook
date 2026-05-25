@@ -1,4 +1,4 @@
-# protobuf-mdbook & protoc-gen-mdbook
+# protobuf-mdbook
 
 > [!WARNING]
 > Clanker generated code, running an auto-release pipeline.
@@ -7,7 +7,8 @@
 
 **protobuf-mdbook** and **protoc-gen-mdbook** share one generator: they turn
 protobuf schemas and comments into **mdBook** documentation (or Markdown-only
-trees).
+trees). **`mdbook-protobuf-highlight`** is a separate mdBook preprocessor that
+highlights `protobuf` / `cel` fences at **`mdbook build`** time.
 
 - [Developer Documentation](#development)
 
@@ -15,14 +16,17 @@ trees).
 |--------|------|------|
 | **`protobuf-mdbook`** | Standalone CLI — writes files to disk (`-o` / `--output`) | [Standalone CLI](#standalone-cli-protobuf-mdbook) |
 | **`protoc-gen-mdbook`** | **protoc** plugin — reads `CodeGeneratorRequest` on stdin, writes `CodeGeneratorResponse` on stdout | [Protoc plugin](#protoc-plugin-protoc-gen-mdbook) |
+| **`mdbook-protobuf-highlight`** | **mdBook** preprocessor — highlights `protobuf` / `cel` fences at build time; `install` patches `book.toml` | [Syntax highlighting](#syntax-highlighting) |
 
 The pinned **[mdBook](https://rust-lang.github.io/mdBook/)** release is declared
-in root [`Cargo.toml`](Cargo.toml) (`mdbook-core` / `mdbook-driver`). Both
-binaries report the exact pin at runtime:
+in root [`Cargo.toml`](Cargo.toml) (`mdbook-core` / `mdbook-driver` /
+`mdbook-preprocessor`). All three binaries report the exact pin at runtime and
+share the crate version:
 
 ```bash
-protobuf-mdbook --version      # or -V
-protoc-gen-mdbook --version    # or -V
+protobuf-mdbook --version           # or -V (includes mdbook pin)
+protoc-gen-mdbook --version         # or -V (includes mdbook pin)
+mdbook-protobuf-highlight --version # or -V (includes mdbook pin)
 ```
 
 ## Example documentation
@@ -31,8 +35,6 @@ The example book built from [`examples/proto/`](examples/proto/) is published to
 GitHub Pages on each push to `main`:
 
 <https://canardleteer.github.io/protobuf-mdbook/>
-
-(Site may be unavailable until GitHub Pages is enabled for this repository.)
 
 ## Install
 
@@ -67,7 +69,23 @@ only with `--bin protoc-gen-mdbook`, `--bin protobuf-mdbook`, or
 
 #### `protoc-gen-mdbook`
 
-This matches the traditional (some may say ancient) pattern of using `protoc`.
+`protoc` adaptation of `protobuf-mdbook`.
+
+#### `mdbook-protobuf-highlight`
+
+mdBook invokes this preprocessor during **`mdbook build`** / **`mdbook serve`**
+(stdin/stdout book JSON). It does not read `.proto` files — generation stays in
+**`protobuf-mdbook`** / **`protoc-gen-mdbook`**.
+
+- **`init`** wires `[preprocessor.protobuf-highlight]` in `book.toml` by
+  default.
+- Existing books: **`mdbook-protobuf-highlight install [book-root]`** then
+  **`mdbook build`**.
+- Requires **`mdbook-protobuf-highlight`** on PATH (same `cargo install` as the
+  other binaries).
+
+See [Syntax highlighting](#syntax-highlighting) for toggles, theme CSS, and
+maintainer workflow.
 
 ## Standalone CLI (`protobuf-mdbook`)
 
@@ -278,7 +296,7 @@ documented entities when those types are in `file_to_generate`.
 Generated API pages use ` ```protobuf ` fences; Protovalidate message-level CEL
 rules also emit adjacent ` ```cel ` blocks at generation time. At
 **`mdbook build`** time, **`mdbook-protobuf-highlight`** converts those
-fences into pre-highlighted HTML (`<pre class="hljs …">`) compatible with
+fences into pre-highlighted HTML (`<pre class="protobuf-mdbook …">`) compatible with
 mdBook’s bundled
 [`highlight.css`](https://rust-lang.github.io/mdBook/format/theme/syntax-highlighting.html).
 
