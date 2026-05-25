@@ -5,13 +5,23 @@
 >
 > Decide if that degree of automation is appropriate for your requirements.
 
+- [Example Output: `examples/proto`](https://canardleteer.github.io/protobuf-mdbook/)
+- [Developer Documentation](#development)
+
+## Features
+
+- `.proto` → `mdBook` documentation
+- `buf` and `protoc` support
+- Build-time syntax highlighting
+- Markdown generation layout flexibility
+- Companion Markdown file support
+
+## Tools
+
 **protobuf-mdbook** and **protoc-gen-mdbook** share one generator: they turn
 protobuf schemas and comments into **mdBook** documentation (or Markdown-only
 trees). **`mdbook-protobuf-highlight`** is a separate mdBook preprocessor that
 highlights `protobuf` / `cel` fences at **`mdbook build`** time.
-
-- [Example Output: `examples/proto`](https://canardleteer.github.io/protobuf-mdbook/)
-- [Developer Documentation](#development)
 
 | Binary | Role | Docs |
 |--------|------|------|
