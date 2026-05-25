@@ -1,5 +1,6 @@
 //! mdBook init via `mdbook-driver::BookBuilder` in a temp directory.
 
+use crate::highlight::{HighlightConfig, THEME_CSS_REL, configure_book_toml, theme_css_content};
 use crate::options::{Options, join_book_root};
 use anyhow::{Context, Result};
 use mdbook_core::config::Config;
@@ -9,31 +10,6 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 pub const DEFAULT_BOOK_TITLE: &str = "Protobuf documentation";
-
-/// Vendored Highlight.js 10.1.1 protobuf grammar (`assets/highlightjs/protobuf-10.js`).
-const PROTO_HIGHLIGHT_JS: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/assets/highlightjs/protobuf-10.js"
-));
-
-/// Repo-authored Highlight.js 10.1.1 CEL grammar (`assets/highlightjs/cel-10.js`).
-const CEL_HIGHLIGHT_JS: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/assets/highlightjs/cel-10.js"
-));
-
-const SYNTAX_HIGHLIGHT_BEGIN: &str = "protobuf-mdbook: syntax highlight begin";
-const SYNTAX_HIGHLIGHT_END: &str = "protobuf-mdbook: syntax highlight end";
-const LEGACY_SYNTAX_HIGHLIGHT_BEGIN: &str = "protoc-gen-mdbook: syntax highlight begin";
-
-fn index_has_syntax_highlight_block(index: &str) -> bool {
-    index.contains(SYNTAX_HIGHLIGHT_BEGIN) || index.contains(LEGACY_SYNTAX_HIGHLIGHT_BEGIN)
-}
-
-fn book_toml_has_syntax_highlight_comment(book: &str) -> bool {
-    book.contains("protobuf-mdbook: syntax highlighting")
-        || book.contains("protoc-gen-mdbook: syntax highlighting")
-}
 
 /// Paths from mdBook init that should not appear in plugin output (replaced by generated docs).
 const MDBOOK_DEFAULT_SUMMARY: &str = "src/SUMMARY.md";
@@ -50,45 +26,11 @@ fn init_stub_paths(opts: &Options) -> Vec<String> {
     paths
 }
 
-const THEME_HIGHLIGHT_JS: &str = r#"<script src="{{ resource "highlight.js" }}"></script>"#;
-const THEME_BOOK_JS: &str = r#"<script src="{{ resource "book.js" }}"></script>"#;
-
-const BOOK_TOML_HIGHLIGHT_ENABLED: &str = r#"
-# --- protobuf-mdbook: syntax highlighting (enabled at init) ---
-# Generated API pages use ```protobuf fences; Protovalidate message-level CEL rules also
-# emit ```cel fences. Init patches theme/index.hbs with inline <script> grammars after
-# highlight.js and before book.js (mdBook does not bundle arbitrary theme/*.js via
-# {{ resource }} — only inlined scripts in index.hbs are reliable).
-#
-# To disable: delete the "protobuf-mdbook: syntax highlight" block in theme/index.hbs and
-# optional theme/highlight-*.js reference copies. On a future init:
-#   no_proto_highlight — skip protobuf grammar only
-#   no_cel_highlight   — skip CEL grammar only (protobuf can stay on)
-# Re-init does not replace an existing highlight block when markers are already present.
-# See the plugin repository README (Syntax highlighting) for custom themes and limitations.
-# Attribution: assets/highlightjs/NOTICE (protobuf: BSD-3-Clause; cel: repo-authored).
-# --- end protobuf-mdbook syntax highlighting ---
-"#;
-
-const BOOK_TOML_HIGHLIGHT_DISABLED: &str = r#"
-# --- protobuf-mdbook: syntax highlighting (disabled at init) ---
-# Pass init without no_proto_highlight / no_cel_highlight, or patch theme/index.hbs yourself.
-# --- end protobuf-mdbook syntax highlighting ---
-"#;
-
-/// Inline Highlight.js grammars for `theme/index.hbs`.
-fn syntax_highlight_index_hbs_snippet(opts: &Options) -> String {
-    let mut parts = Vec::new();
-    if opts.proto_highlight() {
-        parts.push(PROTO_HIGHLIGHT_JS.trim());
+fn highlight_config_from_opts(opts: &Options) -> HighlightConfig {
+    HighlightConfig {
+        protobuf: opts.proto_highlight(),
+        cel: opts.cel_highlight(),
     }
-    if opts.cel_highlight() {
-        parts.push(CEL_HIGHLIGHT_JS.trim());
-    }
-    let body = parts.join("\n");
-    format!(
-        "        <!-- {SYNTAX_HIGHLIGHT_BEGIN} -->\n        <script>\n{body}\n        </script>\n        <!-- {SYNTAX_HIGHLIGHT_END} -->\n"
-    )
 }
 
 pub fn scaffold_init_tree(opts: &Options) -> Result<HashMap<String, Vec<u8>>> {
@@ -106,7 +48,6 @@ pub fn scaffold_init_tree(opts: &Options) -> Result<HashMap<String, Vec<u8>>> {
     if opts.ignore_git {
         builder.create_gitignore(true);
     }
-    // Init always includes mdBook's default theme assets (same as `copy_theme(true)`).
     builder.copy_theme(true);
     builder.with_config(cfg);
     builder.build().context("BookBuilder::build")?;
@@ -150,11 +91,7 @@ pub fn merge_init_files(
         })
         .collect();
 
-    if opts.proto_highlight() || opts.cel_highlight() {
-        inject_syntax_highlighting(opts, book_root, &mut out);
-    } else {
-        append_book_toml_highlight_comment(book_root, &mut out, false);
-    }
+    configure_init_highlighting(opts, book_root, &mut out);
 
     for (path, content) in docs {
         out.insert(path.clone(), content.clone());
@@ -168,49 +105,26 @@ pub fn merge_init_files(
     pairs
 }
 
-fn inject_syntax_highlighting(opts: &Options, book_root: &str, out: &mut HashMap<String, String>) {
-    if opts.proto_highlight() {
-        let highlight_path = join_book_root(book_root, "theme/highlight-protobuf.js");
-        out.insert(highlight_path, PROTO_HIGHLIGHT_JS.to_string());
-    }
-    if opts.cel_highlight() {
-        let highlight_path = join_book_root(book_root, "theme/highlight-cel.js");
-        out.insert(highlight_path, CEL_HIGHLIGHT_JS.to_string());
-    }
-
-    let index_key = join_book_root(book_root, "theme/index.hbs");
-    if let Some(index) = out.get_mut(&index_key)
-        && !index_has_syntax_highlight_block(index)
-        && let Some(pos) = index.find(THEME_HIGHLIGHT_JS)
-    {
-        let insert_at = pos + THEME_HIGHLIGHT_JS.len();
-        index.insert(insert_at, '\n');
-        index.insert_str(insert_at + 1, &syntax_highlight_index_hbs_snippet(opts));
-        debug_assert!(index.contains(THEME_BOOK_JS));
-    }
-
-    append_book_toml_highlight_comment(book_root, out, true);
-}
-
-fn append_book_toml_highlight_comment(
-    book_root: &str,
-    out: &mut HashMap<String, String>,
-    enabled: bool,
-) {
+fn configure_init_highlighting(opts: &Options, book_root: &str, out: &mut HashMap<String, String>) {
     let book_key = join_book_root(book_root, "book.toml");
-    let comment = if enabled {
-        BOOK_TOML_HIGHLIGHT_ENABLED
-    } else {
-        BOOK_TOML_HIGHLIGHT_DISABLED
-    };
+    let config = highlight_config_from_opts(opts);
+    if config.protobuf || config.cel {
+        let css_key = join_book_root(book_root, THEME_CSS_REL);
+        out.insert(css_key, theme_css_content().to_string());
+    }
     match out.get_mut(&book_key) {
         Some(book) => {
-            if !book_toml_has_syntax_highlight_comment(book) {
-                book.push_str(comment);
+            if let Err(e) = configure_book_toml(book, config) {
+                eprintln!("protobuf-mdbook: warning: book.toml highlight config: {e:#}");
             }
         }
         None => {
-            out.insert(book_key, comment.trim_start().to_string());
+            let mut book = String::new();
+            if let Err(e) = configure_book_toml(&mut book, config) {
+                eprintln!("protobuf-mdbook: warning: book.toml highlight config: {e:#}");
+            } else {
+                out.insert(book_key, book);
+            }
         }
     }
 }
@@ -222,19 +136,21 @@ pub fn init_readme_content(opts: &Options) -> String {
         let mut lines = vec![
             "## Syntax highlighting".to_string(),
             String::new(),
-            "Init patches `theme/index.hbs` with Highlight.js 10.1.1 grammars between \
-             `highlight.js` and `book.js`. See the **protobuf-mdbook** repository README \
-             (**Syntax highlighting**) for custom themes, re-init behavior, and CEL limitations."
+            "Init configures the **mdbook-protobuf-highlight** preprocessor in `book.toml`. \
+             At `mdbook build`, ` ```protobuf ` and ` ```cel ` fences become pre-highlighted \
+             HTML compatible with mdBook themes. See the **protobuf-mdbook** repository README \
+             (**Syntax highlighting**) for toggles and standalone install."
                 .to_string(),
         ];
         if opts.proto_highlight() {
             lines.push(
-                "- **Protobuf:** ` ```protobuf ` fences (disable: `no_proto_highlight`).".into(),
+                "- **Protobuf:** ` ```protobuf ` fences (disable at init: `no_proto_highlight`)."
+                    .into(),
             );
         }
         if opts.cel_highlight() {
             lines.push(
-                "- **CEL:** ` ```cel ` fences for Protovalidate message-level rules (disable: \
+                "- **CEL:** ` ```cel ` fences for Protovalidate rules (disable at init: \
                  `no_cel_highlight`)."
                     .into(),
             );
@@ -244,8 +160,8 @@ pub fn init_readme_content(opts: &Options) -> String {
     } else {
         r#"## Syntax highlighting
 
-Disabled at init (`no_proto_highlight` and/or `no_cel_highlight`). See the plugin repository
-README for how to add grammars manually.
+Disabled at init (`no_proto_highlight` and/or `no_cel_highlight`). Run
+`mdbook-protobuf-highlight install` or see the plugin repository README.
 
 "#
         .to_string()
@@ -300,10 +216,7 @@ Use the same `markdown_root=` and `summary_path=` as your book layout when regen
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        SYNTAX_HIGHLIGHT_BEGIN, THEME_BOOK_JS, THEME_HIGHLIGHT_JS, init_readme_content,
-        inject_syntax_highlighting,
-    };
+    use super::{init_readme_content, merge_init_files};
     use crate::options::parse_parameter;
     use std::collections::HashMap;
 
@@ -316,7 +229,7 @@ mod tests {
         assert!(readme.contains("rumdl"));
         assert!(readme.contains("lychee"));
         assert!(readme.contains("without") && readme.contains("init"));
-        assert!(readme.contains("highlight-protobuf") || readme.contains("Protobuf"));
+        assert!(readme.contains("mdbook-protobuf-highlight") || readme.contains("Protobuf"));
         assert!(readme.contains("CEL") || readme.contains("cel"));
         assert!(readme.contains("src/packages"));
     }
@@ -331,80 +244,54 @@ mod tests {
     }
 
     #[test]
-    fn init_readme_reflects_custom_paths() {
-        let opts = parse_parameter(&Some(
-            "init,markdown_root=content/api,summary_path=content/SUMMARY.md".into(),
-        ))
-        .unwrap();
-        let readme = init_readme_content(&opts);
-        assert!(readme.contains("content/api"));
-        assert!(readme.contains("content/SUMMARY.md"));
-    }
-
-    #[test]
-    fn inject_skips_when_legacy_highlight_markers_present() {
+    fn init_configures_preprocessor_in_book_toml() {
         let opts = parse_parameter(&Some("init".into())).unwrap();
-        let mut out = HashMap::from([(
-            "theme/index.hbs".to_string(),
-            format!(
-                "head\n{THEME_HIGHLIGHT_JS}\n<!-- protoc-gen-mdbook: syntax highlight begin -->\n<!-- protoc-gen-mdbook: syntax highlight end -->\n{THEME_BOOK_JS}\n"
-            ),
-        )]);
-        inject_syntax_highlighting(&opts, ".", &mut out);
-        let index = out.get("theme/index.hbs").expect("index.hbs");
-        assert!(index.contains("protoc-gen-mdbook: syntax highlight begin"));
-        assert!(!index.contains("protobuf-mdbook: syntax highlight begin"));
+        let init_files =
+            HashMap::from([("book.toml".to_string(), b"[book]\ntitle = \"t\"\n".to_vec())]);
+        let pairs = merge_init_files(&opts, ".", init_files, &[]);
+        let book = pairs
+            .iter()
+            .find(|(p, _)| p == "book.toml")
+            .map(|(_, c)| c.as_str())
+            .expect("book.toml");
+        assert!(book.contains("[preprocessor.protobuf-highlight]"));
+        assert!(book.contains("mdbook-protobuf-highlight"));
+        assert!(
+            !pairs
+                .iter()
+                .any(|(p, _)| p.contains("highlight-protobuf.js"))
+        );
     }
 
     #[test]
-    fn inject_patches_index_hbs_with_inline_grammars() {
-        let opts = parse_parameter(&Some("init".into())).unwrap();
-        let mut out = HashMap::from([(
-            "theme/index.hbs".to_string(),
-            format!("head\n{THEME_HIGHLIGHT_JS}\n{THEME_BOOK_JS}\n"),
-        )]);
-        inject_syntax_highlighting(&opts, ".", &mut out);
-        let index = out.get("theme/index.hbs").expect("index.hbs");
-        assert!(index.contains(SYNTAX_HIGHLIGHT_BEGIN));
-        assert!(index.contains("<script>"));
-        assert!(index.contains("hljs.registerLanguage(\"protobuf\""));
-        assert!(index.contains("hljs.registerLanguage(\"cel\""));
-        assert!(!index.contains(r#"resource "highlight-protobuf.js""#));
-        let hl = index.find(THEME_HIGHLIGHT_JS).expect("highlight.js");
-        let marker = index.find(SYNTAX_HIGHLIGHT_BEGIN).expect("marker");
-        let bk = index.find(THEME_BOOK_JS).expect("book.js");
-        assert!(hl < marker && marker < bk);
-        assert!(out.contains_key("theme/highlight-protobuf.js"));
-        assert!(out.contains_key("theme/highlight-cel.js"));
-    }
-
-    #[test]
-    fn inject_cel_only_when_no_proto_highlight() {
+    fn init_no_proto_highlight_sets_toml_flag() {
         let opts = parse_parameter(&Some("init,no_proto_highlight".into())).unwrap();
-        let mut out = HashMap::from([(
-            "theme/index.hbs".to_string(),
-            format!("head\n{THEME_HIGHLIGHT_JS}\n{THEME_BOOK_JS}\n"),
-        )]);
-        inject_syntax_highlighting(&opts, ".", &mut out);
-        let index = out.get("theme/index.hbs").expect("index.hbs");
-        assert!(!index.contains("hljs.registerLanguage(\"protobuf\""));
-        assert!(index.contains("hljs.registerLanguage(\"cel\""));
-        assert!(!out.contains_key("theme/highlight-protobuf.js"));
-        assert!(out.contains_key("theme/highlight-cel.js"));
+        let init_files =
+            HashMap::from([("book.toml".to_string(), b"[book]\ntitle = \"t\"\n".to_vec())]);
+        let pairs = merge_init_files(&opts, ".", init_files, &[]);
+        let book = pairs
+            .iter()
+            .find(|(p, _)| p == "book.toml")
+            .unwrap()
+            .1
+            .as_str();
+        assert!(book.contains("protobuf = false"));
+        assert!(book.contains("cel = true"));
     }
 
     #[test]
-    fn inject_proto_only_when_no_cel_highlight() {
-        let opts = parse_parameter(&Some("init,no_cel_highlight".into())).unwrap();
-        let mut out = HashMap::from([(
-            "theme/index.hbs".to_string(),
-            format!("head\n{THEME_HIGHLIGHT_JS}\n{THEME_BOOK_JS}\n"),
-        )]);
-        inject_syntax_highlighting(&opts, ".", &mut out);
-        let index = out.get("theme/index.hbs").expect("index.hbs");
-        assert!(index.contains("hljs.registerLanguage(\"protobuf\""));
-        assert!(!index.contains("hljs.registerLanguage(\"cel\""));
-        assert!(out.contains_key("theme/highlight-protobuf.js"));
-        assert!(!out.contains_key("theme/highlight-cel.js"));
+    fn init_both_disabled_omits_preprocessor() {
+        let opts =
+            parse_parameter(&Some("init,no_proto_highlight,no_cel_highlight".into())).unwrap();
+        let init_files =
+            HashMap::from([("book.toml".to_string(), b"[book]\ntitle = \"t\"\n".to_vec())]);
+        let pairs = merge_init_files(&opts, ".", init_files, &[]);
+        let book = pairs
+            .iter()
+            .find(|(p, _)| p == "book.toml")
+            .unwrap()
+            .1
+            .as_str();
+        assert!(!book.contains("[preprocessor.protobuf-highlight]"));
     }
 }

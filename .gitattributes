@@ -4,3 +4,6 @@ assets/highlightjs/*.meta.json text eol=lf
 
 # Example protos and companions are checked with `buf format --diff` in CI.
 examples/proto/** text eol=lf
+
+# Golden / highlight fixtures must match Linux CI output on Windows runners.
+tests/fixtures/** text eol=lf

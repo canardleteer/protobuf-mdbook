@@ -38,21 +38,22 @@ GitHub Pages on each push to `main`:
 
 ### Users
 
-Install both commands from crates.io (one crate, two binaries):
+Install three commands from crates.io (one crate, three binaries):
 
 ```bash
 cargo install protobuf-mdbook
 ```
 
-Installs both:
+Installs:
 
-- `protobuf-mdbook`
-  - Standalone binary, to call either `buf` or `protoc` compilers.
-- `protoc-gen-mdbook`
-  - `protoc` compatible plugin.
-That puts **`protobuf-mdbook`** and **`protoc-gen-mdbook`** on your PATH
-(typically `~/.cargo/bin`). Install one binary only with
-`--bin protoc-gen-mdbook` or `--bin protobuf-mdbook`.
+- `protobuf-mdbook` — standalone CLI (`buf` or `protoc` input).
+- `protoc-gen-mdbook` — `protoc` plugin.
+- `mdbook-protobuf-highlight` — mdBook preprocessor for build-time
+  protobuf / CEL highlighting.
+
+That puts all three on your PATH (typically `~/.cargo/bin`). Install one binary
+only with `--bin protoc-gen-mdbook`, `--bin protobuf-mdbook`, or
+`--bin mdbook-protobuf-highlight`.
 
 #### `protobuf-mdbook`
 
@@ -176,9 +177,9 @@ itself does not), or use a discovery script / **`cargo xtask book-refresh`** for
 this repo’s examples.
 
 The same **`init`** / ongoing refresh flow works with **`protobuf-mdbook`** —
-see [Standalone CLI](#standalone-cli-protobuf-mdbook) — using **`-o` / `--output`**
-and native flags such as **`--init`**, **`--layout`**, and **`--book`** instead
-of **`--mdbook_out`** / **`--mdbook_opt`**.
+see [Standalone CLI](#standalone-cli-protobuf-mdbook) — using **`-o` /
+`--output`** and native flags such as **`--init`**, **`--layout`**, and
+**`--book`** instead of **`--mdbook_out`** / **`--mdbook_opt`**.
 
 ## Output modes
 
@@ -215,8 +216,8 @@ With `init`, generated package pages live under `{markdown_root}/`. `init`’s
 placeholder `chapter_1.md` is not included. The default theme is copied into the
 output tree.
 
-By default, `init` also registers **syntax highlighting** grammars in
-`theme/index.hbs` (see [Syntax highlighting](#syntax-highlighting)).
+By default, `init` also wires the **mdbook-protobuf-highlight** preprocessor in
+`book.toml` (see [Syntax highlighting](#syntax-highlighting)).
 
 Entity bodies use **protobuf source-style fenced blocks** (with file paths), not
 field/enum tables. Message-level
@@ -247,8 +248,8 @@ Both binaries share the same semantics; spelling differs by surface:
 | `-I` / `--proto-path <dir>` (repeatable) | `proto_path=<dir>` \| `dir:a:dir:b` | both | Search path(s) for `.proto` sources |
 | `--title <text>` | `title=<text>` | init only | `book.toml` title (default **Protobuf documentation** if omitted) |
 | `--ignore git` \| `none` | `ignore=git` \| `ignore=none` | init only | Whether init emits `.gitignore` (default `git`) |
-| `--no-proto-highlight` | `no_proto_highlight` | init only | Skip protobuf Highlight.js grammar in `theme/index.hbs` (default: on) |
-| `--no-cel-highlight` | `no_cel_highlight` | init only | Skip CEL Highlight.js grammar in `theme/index.hbs` (default: on; independent of protobuf) |
+| `--no-proto-highlight` | `no_proto_highlight` | init only | Set `protobuf = false` in preprocessor config (default: on) |
+| `--no-cel-highlight` | `no_cel_highlight` | init only | Set `cel = false` in preprocessor config (default: on; independent of protobuf) |
 | `--no-proto-markdown` | `no_proto_markdown` | both | Disable copying companion `.md` beside protos and companion entries in SUMMARY |
 | `--escape-tags` \| `--escape-tags entities` | `escape_tags` \| `escape_tags=backticks` \| `escape_tags=entities` | both | Rewrite HTML-like `<…>` in leading-comment prose so mdBook does not treat them as HTML tags (bare flag: inline code; `entities` uses `&lt;…&gt;`) |
 | — | `markdown_only` | — | Deprecated (ignored); default output is already markdown-only |
@@ -274,55 +275,99 @@ documented entities when those types are in `file_to_generate`.
 
 ## Syntax highlighting
 
-mdBook requires an explicit fence language on each code block
-([syntax highlighting](https://rust-lang.github.io/mdBook/format/theme/syntax-highlighting.html));
-auto-detection is off.
+Generated API pages use ` ```protobuf ` fences; Protovalidate message-level CEL
+rules also emit adjacent ` ```cel ` blocks at generation time. At
+**`mdbook build`** time, **`mdbook-protobuf-highlight`** converts those
+fences into pre-highlighted HTML (`<pre class="hljs …">`) compatible with
+mdBook’s bundled
+[`highlight.css`](https://rust-lang.github.io/mdBook/format/theme/syntax-highlighting.html).
 
-On `init`, the generator patches `theme/index.hbs` with inline `<script>`
-grammars **after** `highlight.js` and **before** `book.js`. Arbitrary
-`theme/*.js` files are not loaded via `{{ resource }}` — only inlined scripts in
-`index.hbs` are reliable.
+### Init (default on)
 
-Vendored grammars live in [`assets/highlightjs/`](assets/highlightjs/). Verify
-pins with `cargo xtask check-highlightjs-vendor` (also run in `cargo xtask ci`).
+With `init`, the generator wires `[preprocessor.protobuf-highlight]` in
+`book.toml` (`command = "mdbook-protobuf-highlight"`). Requires
+`mdbook-protobuf-highlight` on PATH when you run `mdbook build` / `mdbook serve`
+(included in `cargo install protobuf-mdbook`).
 
-**Custom themes:** if `[output.html] theme = "…"` in `book.toml` points outside
-the default theme directory, copy the `protobuf-mdbook: syntax highlight`
-block from generated `theme/index.hbs` (and optional `theme/highlight-*.js`
-reference copies) into your theme by hand.
+| Init flag | Effect |
+|-----------|--------|
+| *(default)* | `protobuf = true`, `cel = true` in preprocessor config |
+| `no_proto_highlight` | `protobuf = false`, `cel = true` |
+| `no_cel_highlight` | `protobuf = true`, `cel = false` |
+| both flags | No preprocessor section (highlighting disabled at init) |
 
-**Re-init / customized books:** repeating `init` does **not** replace an
-existing highlight block in `index.hbs` when the marker comments are already
-present. To pick up grammar updates after upgrading, delete the marker block
-(or merge manually), then re-run `init` or paste the new inline script from a
-fresh scaffold. Back up theme edits before `init`.
+### Standalone install
 
-### Protobuf
+For books not created via `init`:
 
-- Default **on** with `init`; generated entity bodies use `protobuf` fenced
-  blocks.
-- Disable: `no_proto_highlight` (init only).
-- Grammar: vendored from
-  [Highlight.js](https://github.com/highlightjs/highlight.js) 10.1.1
-  (`protobuf-10.js`); BSD-3-Clause — see
-  [`assets/highlightjs/NOTICE`](assets/highlightjs/NOTICE).
-- Reference copy in the book tree: `theme/highlight-protobuf.js` (registration
-  is inlined in `index.hbs`).
+```bash
+mdbook-protobuf-highlight install [book-root]
+mdbook build
+```
 
-### CEL
+Toggle languages in `book.toml`:
 
-- Default **on** with `init` (independent of protobuf); highlights `cel` fenced
-  blocks.
-- The renderer splits `option (buf.validate.message).cel = { … };` (and
-  message-level `cel_expression`) out of `protobuf` fences into adjacent
-  `cel` blocks (`id`, `message`, `expression` lines).
-- Field-level `[(buf.validate.field).cel …]` stays inside `protobuf` fences (not
-  split).
-- Disable: `no_cel_highlight` (init only). Protobuf highlighting can stay
-  enabled (`init` without `no_proto_highlight`).
-- Grammar: repo-authored `cel-10.js` (HLJS 10.1.1; no upstream Highlight.js
-  language file); see [`assets/highlightjs/NOTICE`](assets/highlightjs/NOTICE).
-- Reference copy: `theme/highlight-cel.js`.
+```toml
+[preprocessor.protobuf-highlight]
+command = "mdbook-protobuf-highlight"
+protobuf = true
+cel = true
+```
+
+Custom themes need no `index.hbs` patches — highlighting is build-time HTML, not
+client-side Highlight.js registration.
+
+### Protobuf and CEL behavior
+
+- **Protobuf / proto fences:** highlight proto body; split message-level
+  `(buf.validate.message).cel` into separate highlighted CEL blocks (same rules
+  as generation-time `cel_fence`).
+- **CEL fences:** highlight directly (hand-written companion markdown).
+- **Field-level** `[(buf.validate.field).cel …]` stays inside protobuf blocks.
+
+Grammar rules are ported to Rust in [`src/highlight/`](src/highlight/) from
+reference files in [`assets/highlightjs/`](assets/highlightjs/) (protobuf:
+BSD-3-Clause upstream HLJS 10.1.1; CEL: repo-authored). CI proves output via
+golden HTML fixtures (`cargo xtask check-highlight-rust`).
+
+### Maintainer workflow
+
+After intentional grammar changes:
+
+```bash
+cargo xtask update-highlight-golden
+cargo xtask check-highlight-rust
+```
+
+### Syntax grammar theme customization
+
+Highlighting emits `<pre class="protobuf-mdbook language-protobuf">` or
+`language-cel` with inner `hljs-*` spans. Init installs
+`theme/protobuf-highlight.css` (layout only); token colors come from mdBook’s
+`highlight.css`. Scope overrides with `pre.language-protobuf` /
+`pre.language-cel` (block) or `pre.language-cel .hljs-string`(tokens).
+
+New token classes require editing [`src/highlight/`](src/highlight/).
+
+```toml
+[output.html]
+additional-css = [
+  "theme/protobuf-highlight.css",
+  "theme/my-protobuf-theme.css",
+]
+```
+
+```css
+/* theme/my-protobuf-theme.css — proto block typography */
+pre.language-protobuf {
+  font-family: var(--mono-font);
+  color: var(--fg);
+}
+
+/* CEL-only token colors */
+pre.language-cel .hljs-title { color: #9cdcfe; }
+pre.language-cel .hljs-string { color: #ce9178; }
+```
 
 ### Limitations
 
@@ -376,8 +421,8 @@ Build from source (Rust toolchain: see
 cargo build --release
 ```
 
-Binaries: `target/release/protobuf-mdbook` and
-`target/release/protoc-gen-mdbook`.
+Binaries: `target/release/protobuf-mdbook`, `target/release/protoc-gen-mdbook`,
+and `target/release/mdbook-protobuf-highlight`.
 
 ### xtasks
 
@@ -385,7 +430,7 @@ From the **repository root**:
 
 | Command | Purpose |
 |---------|---------|
-| `cargo xtask ci` | check-toolchain, `buf-lint`, `fmt-check`, clippy, test, build-plugin, `book-init --markdown-only`, `book-links` |
+| `cargo xtask ci` | check-toolchain, `buf-lint`, `fmt-check`, clippy, test, build-plugin, `check-highlight-rust`, `book-init --markdown-only`, `book-links` |
 | `cargo xtask fmt` | `cargo fmt` + `buf format -w` on `examples/proto/` |
 | `cargo xtask fmt-check` | `cargo fmt --check` + `buf format --diff` on `examples/proto/` |
 | `cargo xtask buf-lint` | `buf lint` on `examples/proto/` (needs [Buf CLI](https://buf.build/docs/cli/installation/); see [`buf.lock`](examples/proto/buf.lock)) |
@@ -401,7 +446,8 @@ From the **repository root**:
 | `cargo xtask rumdl-fmt` | Format this crate `README.md` (needs `rumdl` on PATH) |
 | `cargo xtask rumdl-check` | Lint root `README.md` with rumdl |
 | `cargo xtask docker` | Build linux/amd64 scratch image + runtime smoke tests |
-| `cargo xtask check-highlightjs-vendor` | Verify vendored `protobuf` / `cel` grammars vs `*.meta.json` (and upstream for protobuf) |
+| `cargo xtask check-highlight-rust` | Verify Rust highlighter output vs golden HTML in `tests/fixtures/highlight/` |
+| `cargo xtask update-highlight-golden` | Refresh highlight golden HTML after grammar changes |
 
 **Guided `book-init` / `book-refresh`:** default **`--generator protoc`**
 (`protoc` + **`protoc-gen-mdbook`**; matches CI). Use **`--generator cli`** for

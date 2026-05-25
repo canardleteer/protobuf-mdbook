@@ -3,7 +3,7 @@
 mod book;
 mod ci;
 mod docker;
-mod vendor;
+mod highlight;
 mod workspace;
 
 use anyhow::Result;
@@ -21,7 +21,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// buf-lint, fmt-check, clippy, test, build-plugin, book-init --markdown-only, book-links
+    /// buf-lint, fmt-check, clippy, test, build-plugin, check-highlight-rust, book-init --markdown-only, book-links
     Ci,
     /// `cargo fmt` on this workspace plus `buf format -w` on `examples/proto/`.
     Fmt,
@@ -57,7 +57,8 @@ enum Cmd {
     RumdlCheck,
     RumdlFmt,
     Docker,
-    CheckHighlightjsVendor,
+    CheckHighlightRust,
+    UpdateHighlightGolden,
     BufLint,
     BufFormat,
     BufFormatCheck,
@@ -85,7 +86,7 @@ fn main() -> Result<()> {
             run("clippy", ci::clippy)?;
             run("test", ci::test)?;
             run("build-plugin", ci::build_plugin)?;
-            run("check-highlightjs-vendor", vendor::check_highlightjs_vendor)?;
+            run("check-highlight-rust", highlight::check_highlight_rust)?;
             run("book-init", || {
                 book::book_init("package", false, true, GeneratorArg::Protoc)
             })?;
@@ -114,7 +115,8 @@ fn main() -> Result<()> {
         Cmd::RumdlCheck => ci::rumdl_check(),
         Cmd::RumdlFmt => ci::rumdl_fmt(),
         Cmd::Docker => docker::docker(),
-        Cmd::CheckHighlightjsVendor => vendor::check_highlightjs_vendor(),
+        Cmd::CheckHighlightRust => highlight::check_highlight_rust(),
+        Cmd::UpdateHighlightGolden => highlight::update_highlight_golden(),
         Cmd::BufLint => ci::buf_lint(),
         Cmd::BufFormat => ci::buf_format(),
         Cmd::BufFormatCheck => ci::buf_format_check(),

@@ -1,0 +1,5 @@
+message EchoRequest {
+  string message = 1;
+  // inline comment
+  int32 count = 2;
+}

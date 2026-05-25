@@ -1,0 +1,3 @@
+service EchoService {
+  rpc EchoUnary (EchoRequest) returns (EchoResponse);
+}

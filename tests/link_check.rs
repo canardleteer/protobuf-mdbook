@@ -166,19 +166,15 @@ mirrored_test!(init_writes_mdbook_tree_and_readme, |backend| {
     assert!(readme.contains("Syntax highlighting") || readme.contains("CEL"));
     let book = std::fs::read_to_string(out.path().join("book.toml")).expect("book.toml");
     assert!(book.contains("protobuf-mdbook: syntax highlighting"));
-    assert!(out.path().join("theme/highlight-protobuf.js").is_file());
-    assert!(out.path().join("theme/highlight-cel.js").is_file());
+    assert!(book.contains("[preprocessor.protobuf-highlight]"));
+    assert!(book.contains("mdbook-protobuf-highlight"));
+    assert!(book.contains("theme/protobuf-highlight.css"));
+    assert!(out.path().join("theme/protobuf-highlight.css").is_file());
+    assert!(!out.path().join("theme/highlight-protobuf.js").exists());
+    assert!(!out.path().join("theme/highlight-cel.js").exists());
     let index = std::fs::read_to_string(out.path().join("theme/index.hbs")).expect("index.hbs");
-    assert!(index.contains("protobuf-mdbook: syntax highlight begin"));
-    assert!(index.contains("hljs.registerLanguage(\"protobuf\""));
-    assert!(index.contains("hljs.registerLanguage(\"cel\""));
-    assert!(!index.contains(r#"resource "highlight-protobuf.js""#));
-    let hl = index.find("highlight.js").expect("highlight.js");
-    let marker = index
-        .find("protobuf-mdbook: syntax highlight begin")
-        .expect("marker");
-    let bk = index.find("book.js").expect("book.js");
-    assert!(hl < marker && marker < bk);
+    assert!(!index.contains("protobuf-mdbook: syntax highlight begin"));
+    assert!(!index.contains("hljs.registerLanguage(\"protobuf\""));
     protobuf_mdbook::link_check::assert_tree(out.path())
         .unwrap_or_else(|e| panic!("init links ({backend:?}): {e}"));
 });
@@ -187,23 +183,17 @@ mirrored_test!(
     init_no_proto_highlight_skips_protobuf_grammar_only,
     |backend| {
         let out = run_examples("package", "init,no_proto_highlight", backend);
-        assert!(out.path().join("book.toml").is_file());
-        assert!(!out.path().join("theme/highlight-protobuf.js").exists());
-        assert!(out.path().join("theme/highlight-cel.js").is_file());
-        let index = std::fs::read_to_string(out.path().join("theme/index.hbs")).expect("index.hbs");
-        assert!(index.contains("protobuf-mdbook: syntax highlight begin"));
-        assert!(!index.contains("hljs.registerLanguage(\"protobuf\""));
-        assert!(index.contains("hljs.registerLanguage(\"cel\""));
+        let book = std::fs::read_to_string(out.path().join("book.toml")).expect("book.toml");
+        assert!(book.contains("protobuf = false"));
+        assert!(book.contains("cel = true"));
     }
 );
 
 mirrored_test!(init_no_cel_highlight_skips_cel_grammar_only, |backend| {
     let out = run_examples("package", "init,no_cel_highlight", backend);
-    assert!(out.path().join("theme/highlight-protobuf.js").is_file());
-    assert!(!out.path().join("theme/highlight-cel.js").exists());
-    let index = std::fs::read_to_string(out.path().join("theme/index.hbs")).expect("index.hbs");
-    assert!(index.contains("hljs.registerLanguage(\"protobuf\""));
-    assert!(!index.contains("hljs.registerLanguage(\"cel\""));
+    let book = std::fs::read_to_string(out.path().join("book.toml")).expect("book.toml");
+    assert!(book.contains("protobuf = true"));
+    assert!(book.contains("cel = false"));
 });
 
 mirrored_test!(

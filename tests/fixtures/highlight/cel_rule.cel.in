@@ -1,0 +1,3 @@
+id: "numeric_range.min_lte_max"
+message: "min_inclusive must not exceed max_inclusive"
+expression: "this.min_inclusive <= this.max_inclusive"
