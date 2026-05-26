@@ -1,5 +1,9 @@
 # protobuf-mdbook
 
+[![Crates.io](https://img.shields.io/crates/v/protobuf-mdbook.svg)](https://crates.io/crates/protobuf-mdbook)
+[![CI](https://github.com/canardleteer/protobuf-mdbook/actions/workflows/rust-tests.yml/badge.svg?branch=main)](https://github.com/canardleteer/protobuf-mdbook/actions/workflows/rust-tests.yml)
+[![Pages](https://github.com/canardleteer/protobuf-mdbook/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/canardleteer/protobuf-mdbook/actions/workflows/pages.yml)
+
 > [!WARNING]
 > Clanker generated code, running an auto-release pipeline.
 >
