@@ -3,7 +3,7 @@
 # Pinned Buf CLI for builder sanity checks (`buf --version`), matching `buf-toolchain` 1.69.0.
 # Runtime image remains `scratch` + static `protoc-gen-mdbook` only.
 
-ARG RUST_VERSION=1.95.0
+ARG RUST_VERSION=1.96.0
 
 FROM rust:${RUST_VERSION}-bookworm AS buf-anchor
 ENV CARGO_HOME=/usr/local/cargo

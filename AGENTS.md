@@ -4,7 +4,7 @@
 
 - Rust is pinned in `rust-toolchain.toml` (exact stable channel, not rolling
   `stable`). Bump the pin there when you advance the compiler.
-- CI installs the pin via `dtolnay/rust-toolchain@1.95.0` (matches `rust-toolchain.toml`).
+- CI installs the pin via `dtolnay/rust-toolchain@1.96.0` (matches `rust-toolchain.toml`).
   `cargo xtask ci` runs `check-toolchain --strict` first. Locally, run
   `cargo xtask check-toolchain` to warn on drift. Use `--strict` to fail.
 
@@ -287,7 +287,7 @@ run `protobuf-mdbook` instead. `book-refresh` passes `book=` and
 ## CI
 
 - Local and GitHub Actions both run `cargo xtask ci` (see `.github/workflows/rust-tests.yml`).
-- CI installs `dtolnay/rust-toolchain@1.95.0` with `components: rustfmt, clippy` (matches `rust-toolchain.toml`).
+- CI installs `dtolnay/rust-toolchain@1.96.0` with `components: rustfmt, clippy` (matches `rust-toolchain.toml`).
   `ci` runs `check-toolchain --strict` before buf lint, fmt-check, and clippy/test.
 - CI installs Buf CLI 1.69.0 with `cargo install buf-toolchain --locked --version 1.69.0`.
   `ci` runs `buf-lint` and `fmt-check` (includes `buf format --diff` on `examples/proto/`).

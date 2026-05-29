@@ -4,7 +4,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    # dtolnay/rust-toolchain@1.95.0 pins the compiler (matches rust-toolchain.toml),
+    # dtolnay/rust-toolchain@1.96.0 pins the compiler (matches rust-toolchain.toml),
     # not the action release. Dependabot semver-bumps the ref to nonsense like 1.100.0.
     ignore:
       - dependency-name: dtolnay/rust-toolchain
