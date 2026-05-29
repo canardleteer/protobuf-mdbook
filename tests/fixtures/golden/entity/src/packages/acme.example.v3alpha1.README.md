@@ -1,14 +1,14 @@
-# acme.example.v3alpha1 — fixture README
+# acme.example.v3alpha1 fixture README
 
 > *Lorem ipsum dolor sit amet, consectetur adipiscing elit.* This file exercises
-> **CommonMark** beside the `.proto` sources. Nothing here is consumed by `protoc`;
-> it is safe fodder for mdBook chapters or local previews.
+> **CommonMark** beside the `.proto` sources. Nothing here is consumed by `protoc`.
+> It is safe fodder for mdBook chapters or local previews.
 
 ## Overview
 
 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium
 doloremque laudantium. The v3alpha1 package complements `acme.example.v1` and
-`acme.example.v2` with **alpha** APIs: feature flags, experiment assignment, and
+`acme.example.v2` with alpha APIs: feature flags, experiment assignment, and
 pipeline orchestration fixtures.
 
 | Topic | Primary protos |
@@ -28,7 +28,7 @@ pipeline orchestration fixtures.
 ## Code sample
 
 ```rust
-// Illustrative only — not compiled by this repository.
+// Illustrative only. Not compiled by this repository.
 fn main() {
     println!("preview v3alpha1 docs");
 }

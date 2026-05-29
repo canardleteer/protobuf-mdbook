@@ -1,15 +1,15 @@
-# Developer notes — v3alpha1 fixtures
+# Developer notes for v3alpha1 fixtures
 
-Internal notes for maintainers of `protobuf-mdbook` example protos. **Lorem
-ipsum** filler below is intentional stress text for mdBook preprocessors.
+Internal notes for maintainers of `protobuf-mdbook` example protos. Lorem
+ipsum filler below is intentional stress text for mdBook preprocessors.
 
 ## Conventions
 
 - Package id: `acme.example.v3alpha1` (alpha suffix in the protobuf package name).
-- Cross-links: prefer `acme.example.v2` shared types; avoid new Mermaid here
+- Cross-links: prefer `acme.example.v2` shared types. Avoid new Mermaid here
   (diagrams remain in `acme.example.v1` only).
 - Validation: annotate request-shaped messages with
-  [Protovalidate](https://protovalidate.com/) rules; keep rules valid under `buf lint` (BSR dep in
+  [Protovalidate](https://protovalidate.com/) rules. Keep rules valid under `buf lint` (BSR dep in
   `examples/proto/buf.yaml`).
 
 ## protovalidate smoke targets
@@ -40,4 +40,4 @@ message Example { string id = 1; }
 
 ---
 
-*Last updated: fictional — rotate lorem when touching fixtures.*
+*Last updated: fictional. Rotate lorem when you touch fixtures.*

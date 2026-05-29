@@ -1,24 +1,24 @@
 # Example protos (`examples/proto`)
 
-Test fixtures for **protobuf-mdbook**. The book under `./api-book/` (and the
+Test fixtures for `protobuf-mdbook`. The book under `./api-book/` (and the
 GitHub Pages site published from `main`) is generated from these `.proto` files
-and companion markdown — not a real product API.
+and companion markdown. This is not a real product API.
 
 ## Buf module
 
 Buf module for fixture packages under `acme/example/{v1,v2,v3alpha1}/`.
 
-- **`buf.yaml`** — `STANDARD` lint, `FILE` breaking, BSR dep
+- `buf.yaml` uses `STANDARD` lint, `FILE` breaking, and a BSR dep on
   [`buf.build/bufbuild/protovalidate`](https://buf.build/bufbuild/protovalidate) for
-  `buf/validate/validate.proto` imports. Protovalidate schemas are **not committed**
-  in this repo — only the BSR pin in `buf.lock`.
-- **`buf.lock`** — pinned dep commits (regenerate with `buf dep update` here).
+  `buf/validate/validate.proto` imports. Protovalidate schemas are not committed
+  in this repo. Only the BSR pin in `buf.lock` is checked in.
+- `buf.lock` pins dep commits. Regenerate with `buf dep update` here.
 
-CI runs `buf lint` and `buf format --diff` (via `cargo xtask fmt-check`); Buf resolves
+CI runs `buf lint` and `buf format --diff` (via `cargo xtask fmt-check`). Buf resolves
 deps from the module (no export needed). For raw `protoc`, export deps first (`cargo xtask
 book-*` and link-check tests export automatically):
 
-```bash
+```shell
 cd examples/proto
 buf export . --output ../../target/proto-deps   # gitignored; protoc -I only
 protoc -I . -I ../../target/proto-deps …
@@ -30,6 +30,6 @@ Format locally with `cargo xtask fmt` (`buf format -w` on this directory).
 
 Integration tests, `cargo xtask book-*`, and the root README protoc walkthrough
 document the same eight `acme/example/…` `.proto` files. The authoritative list is
-[`src/examples.rs`](../../src/examples.rs) (`EXAMPLE_PROTO_INPUTS`); it excludes
+[`src/examples.rs`](../../src/examples.rs) (`EXAMPLE_PROTO_INPUTS`). It excludes
 `buf/validate/validate.proto` (use only on `-I` from export). Add new fixture protos
-there when extending this module.
+there when you extend this module.
