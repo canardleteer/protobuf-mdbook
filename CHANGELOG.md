@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/canardleteer/protobuf-mdbook/compare/v0.1.0...v0.1.1) - 2026-05-29
+
+### Other
+
+- rust@1.96.0
+- style update
+- update formatting rules
+- crate/ci status badges
+- features list, tools section
+- tighten up example output
+
 ## [0.1.0](https://github.com/canardleteer/protobuf-mdbook/compare/v0.1.0-rc.3...v0.1.0-rc.4) - 2026-05-25
 
 ### Other
