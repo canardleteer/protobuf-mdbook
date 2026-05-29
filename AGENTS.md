@@ -8,6 +8,51 @@
   runs `check-toolchain --strict` first. Locally: `cargo xtask check-toolchain`
   warns on drift; `--strict` fails.
 
+## Documentation Style Guide (markdown files)
+
+Write like you are explaining something to a colleague. Be direct, specific, and concise.
+
+### Voice and Tone
+
+- Use active voice. "protobuf-mdbook will generate markdown from `proto`" not "markdown from `proto` is created by protobuf-mdbook."
+- Use second person ("you") when addressing the reader.
+- Use present tense. "The command returns an error" not "The command will return an error."
+- State facts. Do not hedge with "simply," "just," "easily," or "of course."
+
+### Things to Avoid
+
+These patterns are common in hard to read text text and erode trust with technical readers. Remove them during review.
+
+| Pattern | Problem | Fix |
+|---|---|---|
+| Unnecessary bold | "This is a **critical** step" on routine instructions. | Reserve bold for UI labels, parameter names, and genuine warnings. |
+| Em dashes everywhere | "The protoc-gen-mdbook — which runs in Docker — creates markdown." | Use commas or split into two sentences. Em dashes are fine sparingly but should not appear multiple times per paragraph. |
+| Superlatives | "protobuf-markdown provides a powerful, robust, seamless experience." | Say what it does, not how great it is. |
+| Hedge words | "Simply run the command" or "You can easily configure..." | Drop the adverb. "Run the command." |
+| Emoji in prose | "🚀 Let's get started!" | No emoji in documentation prose. |
+| Rhetorical questions | "Want to secure your agents? Look no further!" | State the purpose directly. |
+
+### Formatting Rules
+
+- NEVER add line breaks inside an *italic* or **bold**. If you must, start them again on the new line.
+- NEVER add line breaks of [markdown](links).
+- End every sentence with a period.
+- Use `code` formatting for CLI commands, file paths, flags, parameter names, and values.
+- Use `shell` code blocks for copyable CLI examples. Do not prefix commands with `$`:
+
+  ```shell
+  cargo install protobuf-mdbook
+  ```
+
+- Use `text` code blocks for transcripts, log output, and examples that should not be copied verbatim.
+- Use tables for structured comparisons. Keep tables simple (no nested formatting).
+- Use GitHub alert syntax for callouts, not bold text: `> [!NOTE]`, `> [!TIP]`, and `> [!WARNING]`.
+- Use itemized bullet lists when the instructions clearly benefits from them.
+- Do not number section titles. Write "Generate an mdBook from a proto directory" not "Section 1: Generate an mdBook from a proto directory" or "Step 3: Verify."
+- Do not use colons in titles. Write "Generate an mdBook from a proto directory" not "mdBook: Generate from proto."
+- Use colons only to introduce a list. Do not use colons as general-purpose punctuation between clauses.
+
+
 ## mdBook version (single source of truth)
 
 - **Pin:** root [`Cargo.toml`](Cargo.toml) `[workspace.dependencies]` entries

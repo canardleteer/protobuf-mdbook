@@ -9,36 +9,36 @@
 >
 > Decide if that degree of automation is appropriate for your requirements.
 
-- [Example Output: `examples/proto`](https://canardleteer.github.io/protobuf-mdbook/)
+- [Example output from `examples/proto`](https://canardleteer.github.io/protobuf-mdbook/)
 - [Developer Documentation](#development)
 
 ## Features
 
-- `.proto` → `mdBook` documentation
-- `buf` and `protoc` support
-- Build-time syntax highlighting
-- Markdown generation layout flexibility
-- Companion Markdown file support
+- `.proto` → mdBook documentation.
+- `buf` and `protoc` support.
+- Build-time syntax highlighting.
+- Markdown generation layout flexibility.
+- Companion Markdown file support.
 
 ## Tools
 
-**protobuf-mdbook** and **protoc-gen-mdbook** share one generator: they turn
-protobuf schemas and comments into **mdBook** documentation (or Markdown-only
-trees). **`mdbook-protobuf-highlight`** is a separate mdBook preprocessor that
-highlights `protobuf` / `cel` fences at **`mdbook build`** time.
+`protobuf-mdbook` and `protoc-gen-mdbook` share one generator. They turn
+protobuf schemas and comments into mdBook documentation (or Markdown-only
+trees). `mdbook-protobuf-highlight` is a separate mdBook preprocessor that
+highlights `protobuf` / `cel` fences at `mdbook build` time.
 
 | Binary | Role | Docs |
 |--------|------|------|
-| **`protobuf-mdbook`** | Standalone CLI — writes files to disk (`-o` / `--output`) | [Standalone CLI](#standalone-cli-protobuf-mdbook) |
-| **`protoc-gen-mdbook`** | **protoc** plugin — reads `CodeGeneratorRequest` on stdin, writes `CodeGeneratorResponse` on stdout | [Protoc plugin](#protoc-plugin-protoc-gen-mdbook) |
-| **`mdbook-protobuf-highlight`** | **mdBook** preprocessor — highlights `protobuf` / `cel` fences at build time; `install` patches `book.toml` | [Syntax highlighting](#syntax-highlighting) |
+| `protobuf-mdbook` | Standalone CLI. Writes files to disk (`-o` / `--output`) | [Standalone CLI](#standalone-cli-protobuf-mdbook) |
+| `protoc-gen-mdbook` | `protoc` plugin. Reads `CodeGeneratorRequest` on stdin, writes `CodeGeneratorResponse` on stdout | [Protoc plugin](#protoc-plugin-protoc-gen-mdbook) |
+| `mdbook-protobuf-highlight` | mdBook preprocessor. Highlights `protobuf` / `cel` fences at build time; `install` patches `book.toml` | [Syntax highlighting](#syntax-highlighting) |
 
-The pinned **[mdBook](https://rust-lang.github.io/mdBook/)** release is declared
+The pinned [mdBook](https://rust-lang.github.io/mdBook/) release is declared
 in root [`Cargo.toml`](Cargo.toml) (`mdbook-core` / `mdbook-driver` /
 `mdbook-preprocessor`). All three binaries report the exact pin at runtime and
 share the crate version:
 
-```bash
+```shell
 protobuf-mdbook --version           # or -V (includes mdbook pin)
 protoc-gen-mdbook --version         # or -V (includes mdbook pin)
 mdbook-protobuf-highlight --version # or -V (includes mdbook pin)
@@ -50,15 +50,15 @@ mdbook-protobuf-highlight --version # or -V (includes mdbook pin)
 
 Install three commands from crates.io (one crate, three binaries):
 
-```bash
+```shell
 cargo install protobuf-mdbook
 ```
 
 Installs:
 
-- `protobuf-mdbook` — standalone CLI (`buf` or `protoc` input).
-- `protoc-gen-mdbook` — `protoc` plugin.
-- `mdbook-protobuf-highlight` — mdBook preprocessor for build-time
+- `protobuf-mdbook`, the standalone CLI (`buf` or `protoc` input).
+- `protoc-gen-mdbook`, the `protoc` plugin.
+- `mdbook-protobuf-highlight`, the mdBook preprocessor for build-time
   protobuf / CEL highlighting.
 
 That puts all three on your PATH (typically `~/.cargo/bin`). Install one binary
@@ -67,13 +67,13 @@ only with `--bin protoc-gen-mdbook`, `--bin protobuf-mdbook`, or
 
 #### `protobuf-mdbook`
 
-- **`buf` compiler:** **`protobuf-mdbook`** by default uses
-  [buf](https://github.com/bufbuild/buf), which is easy to install with
+- **`buf` compiler:** `protobuf-mdbook` uses
+  [buf](https://github.com/bufbuild/buf) by default. Install it with
   [`buf-toolchain`](https://github.com/canardleteer/buf-rs):
   - `cargo install buf-toolchain`
     ([repo](https://github.com/canardleteer/buf-rs)).
-- **`protoc` compiler:** available as well, but you're on your own for
-  installing it.
+- **`protoc` compiler:** also available. You install and maintain `protoc`
+  yourself.
 
 #### `protoc-gen-mdbook`
 
@@ -81,15 +81,15 @@ only with `--bin protoc-gen-mdbook`, `--bin protobuf-mdbook`, or
 
 #### `mdbook-protobuf-highlight`
 
-mdBook invokes this preprocessor during **`mdbook build`** / **`mdbook serve`**
-(stdin/stdout book JSON). It does not read `.proto` files — generation stays in
-**`protobuf-mdbook`** / **`protoc-gen-mdbook`**.
+mdBook invokes this preprocessor during `mdbook build` / `mdbook serve`
+(stdin/stdout book JSON). It does not read `.proto` files. Generation stays in
+`protobuf-mdbook` / `protoc-gen-mdbook`.
 
-- **`init`** wires `[preprocessor.protobuf-highlight]` in `book.toml` by
+- `init` wires `[preprocessor.protobuf-highlight]` in `book.toml` by
   default.
-- Existing books: **`mdbook-protobuf-highlight install [book-root]`** then
-  **`mdbook build`**.
-- Requires **`mdbook-protobuf-highlight`** on PATH (same `cargo install` as the
+- Existing books: run `mdbook-protobuf-highlight install [book-root]`, then
+  `mdbook build`.
+- Requires `mdbook-protobuf-highlight` on PATH (same `cargo install` as the
   other binaries).
 
 See [Syntax highlighting](#syntax-highlighting) for toggles, theme CSS, and
@@ -97,14 +97,15 @@ maintainer workflow.
 
 ## Standalone CLI (`protobuf-mdbook`)
 
-Use **`protobuf-mdbook`** when you want the same output without wiring a
+Use `protobuf-mdbook` when you want the same output without wiring a
 `protoc` plugin.
 
 ### Buf module (default)
 
-Point at a directory containing `buf.yaml`; BSR deps resolve automatically:
+Point the command at a directory containing `buf.yaml`. BSR deps resolve
+automatically:
 
-```bash
+```shell
 # scaffold mdBook once (under the hood, this calls `mdbook init` via API integration)
 protobuf-mdbook -o ./api-book --init examples/proto
 
@@ -117,29 +118,29 @@ protobuf-mdbook -o ./api-book examples/proto
 If there is no `buf.yaml`, opt into `protoc` (PATH, then vendored `protoc`
 bundled in this crate):
 
-```bash
+```shell
 protobuf-mdbook --compiler protoc -o ./out -I tests/fixtures tests/fixtures/doc_rich.proto
 ```
 
 ### Prebuilt descriptor set (no compiler)
 
-**`protobuf-mdbook --descriptor-set`** reads a binary
-`google.protobuf.FileDescriptorSet` (`.binpb`, `.fds`, or any path — the
-extension is just a convention).
+`protobuf-mdbook --descriptor-set` reads a binary
+`google.protobuf.FileDescriptorSet` (`.binpb`, `.fds`, or any path). The
+extension is a convention.
 
 #### `buf`
 
-Via: `buf build -o ./descriptors.binpb`.
+Run `buf build -o ./descriptors.binpb`.
 
 Generator options are listed in [Generator options](#generator-options) below.
-Run **`protobuf-mdbook --version`** for the pinned mdBook release.
+Run `protobuf-mdbook --version` for the pinned mdBook release.
 
 #### `protoc`
 
-Produce one with **`protoc --descriptor_set_out`** (include source info so
+Produce one with `protoc --descriptor_set_out` (include source info so
 comments and fenced blocks survive):
 
-```bash
+```shell
 # Compile a binpb
 protoc -I tests/fixtures \
   --descriptor_set_out=./descriptors.binpb \
@@ -155,15 +156,15 @@ protobuf-mdbook -o ./out --descriptor-set ./descriptors.binpb
 This walkthrough uses the example protos in [`examples/proto/`](examples/proto/)
 and writes a local book at `./api-book` (gitignored).
 
-```bash
+```shell
 # Build the plugin and confirm versions (mdbook pin is in --version output).
 cargo build
 cargo run -p protobuf-mdbook --bin protoc-gen-mdbook -- --version
 
 PLUGIN=target/debug/protoc-gen-mdbook   # or target/release/...
 
-# ONE-TIME: scaffold a local mdBook at ./api-book from this repo's example protos.
-# Do not repeat `init` on a book you have already customized — it replaces the scaffold.
+# ONE-TIME scaffold a local mdBook at ./api-book from this repo's example protos.
+# Do not repeat `init` on a book you have already customized. It replaces the scaffold.
 (cd examples/proto && buf export . --output ../../target/proto-deps)
 protoc -I examples/proto -I target/proto-deps \
   --plugin=protoc-gen-mdbook="$PLUGIN" \
@@ -172,14 +173,14 @@ protoc -I examples/proto -I target/proto-deps \
   examples/proto/acme/example/{v1,v2,v3alpha1}/*.proto
 
 cd api-book
-# Read ./README.md (generated beside book.toml): next steps, mermaid, rumdl, lychee.
+# Read ./README.md (generated beside book.toml) for next steps, mermaid, rumdl, and lychee.
 # Edit book.toml, SUMMARY, themes, and preprocessors to taste.
-# If you relocate API pages or SUMMARY, note the paths — see ONGOING below.
+# If you relocate API pages or SUMMARY, note the paths. See ONGOING below.
 mdbook build    # static HTML smoke test
 mdbook serve    # live preview while editing
 cd ..
 
-# ONGOING: regenerate API markdown only.
+# ONGOING regenerate API markdown only.
 # Pass `book=` to load `[book] src` from book.toml (via mdbook-core); paths default to
 # `{src}/packages` and `{src}/SUMMARY.md`. Does not touch book.toml, SUMMARY, theme,
 # or api-book/README.md unless you pass summary or init.
@@ -194,18 +195,18 @@ protoc -I examples/proto -I target/proto-deps \
 #   --mdbook_opt=layout=package,book=./api-book,mdbook_out=./api-book,markdown_root=content/api
 ```
 
-Use an **[mdBook](https://rust-lang.github.io/mdBook/)** CLI whose major.minor
-matches either binary’s **`--version`** output when building or serving locally.
+Use an [mdBook](https://rust-lang.github.io/mdBook/) CLI whose major.minor
+matches either binary's `--version` output when you build or serve locally.
 List every `.proto` you want documented (your shell expands globs like
-`{v1,v2,v3alpha1}/*.proto` —
+`{v1,v2,v3alpha1}/*.proto`;
 [`protoc`](https://protobuf.dev/reference/cpp/api-docs/#command-line-interface)
-itself does not), or use a discovery script / **`cargo xtask book-refresh`** for
-this repo’s examples.
+itself does not), or use a discovery script / `cargo xtask book-refresh` for
+this repo's examples.
 
-The same **`init`** / ongoing refresh flow works with **`protobuf-mdbook`** —
-see [Standalone CLI](#standalone-cli-protobuf-mdbook) — using **`-o` /
-`--output`** and native flags such as **`--init`**, **`--layout`**, and
-**`--book`** instead of **`--mdbook_out`** / **`--mdbook_opt`**.
+The same `init` / ongoing refresh flow works with `protobuf-mdbook`. See
+[Standalone CLI](#standalone-cli-protobuf-mdbook). Use `-o` / `--output` and
+native flags such as `--init`, `--layout`, and `--book` instead of
+`--mdbook_out` / `--mdbook_opt`.
 
 ## Output modes
 
@@ -217,35 +218,35 @@ see [Standalone CLI](#standalone-cli-protobuf-mdbook) — using **`-o` /
 
 ### Where files land
 
-**Protoc plugin:** protoc writes each generated path relative to
-**`--mdbook_out`** only. Each file is `{book_root}/…` under that root (default
+With the protoc plugin, protoc writes each generated path relative to
+`--mdbook_out` only. Each file is `{book_root}/…` under that root (default
 `book_root=.`).
 
-**Standalone CLI:** **`protobuf-mdbook`** writes the same relative paths under
-**`-o` / `--output`** (equivalent to **`--mdbook_out`**).
+With the standalone CLI, `protobuf-mdbook` writes the same relative paths under
+`-o` / `--output` (equivalent to `--mdbook_out`).
 
 With default `[book] src`, package pages are `{src}/packages/<package>.md` (e.g.
 `api-book/src/packages/acme.example.v1.md`).
 
-Pass **`book=`** (book root directory or path to `book.toml`) to load
-`[book] src` via **[mdbook-core](https://docs.rs/mdbook-core)** and infer
+Pass `book=` (book root directory or path to `book.toml`) to load
+`[book] src` via [mdbook-core](https://docs.rs/mdbook-core) and infer
 `markdown_root={src}/packages` and `summary_path={src}/SUMMARY.md`. Explicit
-`markdown_root=` / `summary_path=` still override. Pair with **`mdbook_out=`**
+`markdown_root=` / `summary_path=` still override. Pair with `mdbook_out=`
 in options when validating that the output root matches the book root (plugin:
-**`--mdbook_opt`**; CLI: **`-o` / `--output`** with **`--book`**).
+`--mdbook_opt`; CLI: `-o` / `--output` with `--book`).
 
-**Default refresh** (no `init`, no `summary`) updates only package markdown
-under `markdown_root`; it does not rewrite `book.toml`, theme, init `README.md`,
+Default refresh (no `init`, no `summary`) updates only package markdown
+under `markdown_root`. It does not rewrite `book.toml`, theme, init `README.md`,
 or SUMMARY unless you opt in.
 
 With `init`, generated package pages live under `{markdown_root}/`. `init`’s
 placeholder `chapter_1.md` is not included. The default theme is copied into the
 output tree.
 
-By default, `init` also wires the **mdbook-protobuf-highlight** preprocessor in
+By default, `init` also wires the `mdbook-protobuf-highlight` preprocessor in
 `book.toml` (see [Syntax highlighting](#syntax-highlighting)).
 
-Entity bodies use **protobuf source-style fenced blocks** (with file paths), not
+Entity bodies use protobuf source-style fenced blocks (with file paths), not
 field/enum tables. Message-level
 [Protovalidate](https://buf.build/bufbuild/protovalidate) CEL rules are split
 into adjacent `cel` fenced blocks when present in source.
@@ -254,10 +255,10 @@ into adjacent `cel` fenced blocks when present in source.
 
 Both binaries share the same semantics; spelling differs by surface:
 
-- **`protobuf-mdbook`:** native clap flags with hyphens (`--layout entity`,
+- `protobuf-mdbook`: native clap flags with hyphens (`--layout entity`,
   `--no-proto-highlight`); repeatable path flags where noted (`-I` /
   `--proto-path`).
-- **`protoc-gen-mdbook`:** comma-separated on **`--mdbook_opt=…`** (or
+- `protoc-gen-mdbook`: comma-separated on `--mdbook_opt=…` (or
   `CodeGeneratorRequest.parameter`); underscore tokens (`layout=entity`,
   `no_proto_highlight`).
 
@@ -272,7 +273,7 @@ Both binaries share the same semantics; spelling differs by surface:
 | `--markdown-root <path>` | `markdown_root=<path>` | both | API markdown directory (default `src/packages`, or `{src}/packages` with `book=`) |
 | `--summary-path <path>` | `summary_path=<path>` | both | SUMMARY when `summary`/`init` (default `src/SUMMARY.md`, or `{src}/SUMMARY.md` with `book=`) |
 | `-I` / `--proto-path <dir>` (repeatable) | `proto_path=<dir>` \| `dir:a:dir:b` | both | Search path(s) for `.proto` sources |
-| `--title <text>` | `title=<text>` | init only | `book.toml` title (default **Protobuf documentation** if omitted) |
+| `--title <text>` | `title=<text>` | init only | `book.toml` title (default `Protobuf documentation` if omitted) |
 | `--ignore git` \| `none` | `ignore=git` \| `ignore=none` | init only | Whether init emits `.gitignore` (default `git`) |
 | `--no-proto-highlight` | `no_proto_highlight` | init only | Set `protobuf = false` in preprocessor config (default: on) |
 | `--no-cel-highlight` | `no_cel_highlight` | init only | Set `cel = false` in preprocessor config (default: on; independent of protobuf) |
@@ -289,13 +290,13 @@ Paths are under `{book_root}/{markdown_root}/` (defaults: `book_root=.`,
 
 | Value | Output |
 |-------|--------|
-| `package` (default) | `<package>.md` — one page per package |
+| `package` (default) | `<package>.md`, one page per package |
 | `entity` | `<pkg>/messages\|enums\|services/<Name>.md` |
 | `split` | Package `index.md` plus entity pages as in `entity` |
 
 (`<pkg>` uses dots → slashes, e.g. `acme/example/v1`.)
 
-Comments come from `SourceCodeInfo` and are copied **verbatim** (no
+Comments come from `SourceCodeInfo` and are copied verbatim (no
 `@exclude` or protoc-gen-doc directives). Field and RPC types link to other
 documented entities when those types are in `file_to_generate`.
 
@@ -303,10 +304,11 @@ documented entities when those types are in `file_to_generate`.
 
 Generated API pages use ` ```protobuf ` fences; Protovalidate message-level CEL
 rules also emit adjacent ` ```cel ` blocks at generation time. At
-**`mdbook build`** time, **`mdbook-protobuf-highlight`** converts those
-fences into pre-highlighted HTML (`<pre class="protobuf-mdbook …">`) compatible with
-mdBook’s bundled
-[`highlight.css`](https://rust-lang.github.io/mdBook/format/theme/syntax-highlighting.html).
+`mdbook build` time, `mdbook-protobuf-highlight` converts those fences into
+pre-highlighted HTML (`<pre class="protobuf-mdbook …">`) compatible with
+mdBook's bundled [`highlight.css`][mdbook-highlight-css].
+
+[mdbook-highlight-css]: https://rust-lang.github.io/mdBook/format/theme/syntax-highlighting.html
 
 ### Init (default on)
 
@@ -326,7 +328,7 @@ With `init`, the generator wires `[preprocessor.protobuf-highlight]` in
 
 For books not created via `init`:
 
-```bash
+```shell
 mdbook-protobuf-highlight install [book-root]
 mdbook build
 ```
@@ -340,16 +342,16 @@ protobuf = true
 cel = true
 ```
 
-Custom themes need no `index.hbs` patches — highlighting is build-time HTML, not
+Custom themes need no `index.hbs` patches. Highlighting is build-time HTML, not
 client-side Highlight.js registration.
 
 ### Protobuf and CEL behavior
 
-- **Protobuf / proto fences:** highlight proto body; split message-level
+- Protobuf / proto fences: highlight the proto body; split message-level
   `(buf.validate.message).cel` into separate highlighted CEL blocks (same rules
   as generation-time `cel_fence`).
-- **CEL fences:** highlight directly (hand-written companion markdown).
-- **Field-level** `[(buf.validate.field).cel …]` stays inside protobuf blocks.
+- CEL fences: highlight directly (hand-written companion markdown).
+- Field-level `[(buf.validate.field).cel …]` stays inside protobuf blocks.
 
 Grammar rules are ported to Rust in [`src/highlight/`](src/highlight/) from
 reference files in [`assets/highlightjs/`](assets/highlightjs/) (protobuf:
@@ -360,7 +362,7 @@ golden HTML fixtures (`cargo xtask check-highlight-rust`).
 
 After intentional grammar changes:
 
-```bash
+```shell
 cargo xtask update-highlight-golden
 cargo xtask check-highlight-rust
 ```
@@ -397,24 +399,24 @@ pre.language-cel .hljs-string { color: #ce9178; }
 
 ### Limitations
 
-**CEL extraction** uses brace-depth scanning, not a full protobuf/CEL lexer. If
+CEL extraction uses brace-depth scanning, not a full protobuf/CEL lexer. If
 an `expression:` string literal contains `};` sequences, the split may truncate
 or mis-bound the block. Prefer simple expressions in generated docs, or
 hand-written `cel` fenced blocks in proto module READMEs for complex rules.
 
 ## Companion markdown
 
-By default, hand-written `.md` files on the **ancestor path** of each included
-`.proto` (from the import root through the proto’s directory) are copied into
+By default, hand-written `.md` files on the ancestor path of each included
+`.proto` (from the import root through the proto's directory) are copied into
 `{markdown_root}/` using flat names: `dir.segments.<stem>.md` (for example
 `acme/example/v1/README.md` → `{markdown_root}/acme.example.v1.README.md`).
-Content is copied verbatim; the generator does not synthesize module README
+Content is copied verbatim. The generator does not synthesize module README
 bodies. Opt out with `no_proto_markdown`.
 
-SUMMARY/chapter order follows **directory layout**, not protobuf `import`
-relationships. Generated `SUMMARY.md` is a **starting point** — edit nav after
-generation runs. With `summary` or `init`, companions are wired using **minimal
-subchaptering** (pass-through directories without their own `.md` are collapsed;
+SUMMARY/chapter order follows directory layout, not protobuf `import`
+relationships. Generated `SUMMARY.md` is a starting point. Edit nav after
+generation runs. With `summary` or `init`, companions are wired using minimal
+subchaptering (pass-through directories without their own `.md` are collapsed;
 very deep trees may flatten). Section companions use `{module.path} - {title}`
 (dot-separated paths from output filenames); nested subchapters and generated
 package pages use bare titles.
@@ -423,7 +425,7 @@ package pages use bare titles.
 proto/                              # protoc -I root or protobuf-mdbook input root
 └── acme/
     ├── README.md                   # → src/packages/acme.README.md
-    └── example/                    # intermediate — OK to add .md here
+    └── example/                    # intermediate; OK to add .md here
         ├── README.md               # → src/packages/acme.example.README.md
         ├── v1/
         │   ├── README.md           # → src/packages/acme.example.v1.README.md
@@ -435,7 +437,7 @@ proto/                              # protoc -I root or protobuf-mdbook input ro
 ```
 
 Use `proto_path=<dir>` (or `dir:a:dir:b`) when `.proto` paths need extra search
-roots for discovery. Only `.md` on ancestor chains of **included** protos are
+roots for discovery. Only `.md` on ancestor chains of included protos are
 copied.
 
 ## Development
@@ -443,7 +445,7 @@ copied.
 Build from source (Rust toolchain: see
 [`rust-toolchain.toml`](rust-toolchain.toml)):
 
-```bash
+```shell
 cargo build --release
 ```
 
@@ -452,7 +454,7 @@ and `target/release/mdbook-protobuf-highlight`.
 
 ### xtasks
 
-From the **repository root**:
+From the repository root:
 
 | Command | Purpose |
 |---------|---------|
@@ -475,35 +477,35 @@ From the **repository root**:
 | `cargo xtask check-highlight-rust` | Verify Rust highlighter output vs golden HTML in `tests/fixtures/highlight/` |
 | `cargo xtask update-highlight-golden` | Refresh highlight golden HTML after grammar changes |
 
-**Guided `book-init` / `book-refresh`:** default **`--generator protoc`**
-(`protoc` + **`protoc-gen-mdbook`**; matches CI). Use **`--generator cli`** for
-**`protobuf-mdbook`** on `examples/proto/` (needs Buf on PATH):
+Guided `book-init` / `book-refresh` default to `--generator protoc`
+(`protoc` + `protoc-gen-mdbook`; matches CI). Use `--generator cli` for
+`protobuf-mdbook` on `examples/proto/` (needs Buf on PATH):
 
-```bash
+```shell
 cargo xtask book-init --generator cli
 cargo xtask book-refresh --generator cli
 ```
 
-**Local preview:** `cargo xtask book-init`, then `cd api-book && mdbook serve`
+Local preview: run `cargo xtask book-init`, then `cd api-book && mdbook serve`
 (or `cargo xtask book-build`).
 
 ### Example protos
 
-Example protos: [`examples/proto/`](examples/proto/) (Buf module; Protovalidate
-via BSR dep in [`buf.yaml`](examples/proto/buf.yaml)). **`--generator protoc`**
-/ tests run `buf export` to `target/proto-deps/` for `protoc -I` — do not pass
-exported `.proto` files as protoc inputs. Generated book: `./api-book/`
-(gitignored).
+Example protos live in [`examples/proto/`](examples/proto/) (Buf module;
+Protovalidate via BSR dep in [`buf.yaml`](examples/proto/buf.yaml)).
+`--generator protoc` and tests run `buf export` to `target/proto-deps/` for
+`protoc -I`. Do not pass exported `.proto` files as protoc inputs. Generated
+book: `./api-book/` (gitignored).
 
-**Canonical protoc inputs:** [`src/examples.rs`](src/examples.rs) defines
-`protobuf_mdbook::examples::EXAMPLE_PROTO_INPUTS` — the eight `acme/example/…`
-files used by **`cargo xtask book-*`**, integration tests, and link-check runs.
-That list matches the shell globs in the protoc walkthrough above and **excludes**
+Canonical protoc inputs are defined in [`src/examples.rs`](src/examples.rs) as
+`protobuf_mdbook::examples::EXAMPLE_PROTO_INPUTS`, the eight `acme/example/…`
+files used by `cargo xtask book-*`, integration tests, and link-check runs.
+That list matches the shell globs in the protoc walkthrough above and excludes
 `buf/validate/validate.proto` (import-only via `buf export`). When you add a
-new fixture `.proto` under `acme/`, append its path relative to `examples/proto/`
-to `EXAMPLE_PROTO_INPUTS`. **`protobuf-mdbook examples/proto`** (Buf module root)
-still discovers module protos via Buf; only the explicit protoc / xtask / test paths
-use the shared list.
+new fixture `.proto` under `acme/`, append its path relative to
+`examples/proto/` to `EXAMPLE_PROTO_INPUTS`. `protobuf-mdbook examples/proto`
+(Buf module root) still discovers module protos via Buf. Only the explicit
+protoc / xtask / test paths use the shared list.
 
 ### Contributing
 
@@ -511,22 +513,22 @@ Contributor details: [`AGENTS.md`](AGENTS.md).
 
 ## Docker (linux/amd64)
 
-Container **runtime** images are `scratch` + the static **`protoc-gen-mdbook`**
+Container runtime images are `scratch` plus the static `protoc-gen-mdbook`
 binary only (non-root `nobody` user). The [`Dockerfile`](Dockerfile) uses a
-**`buf-anchor`** stage (`cargo install buf-toolchain --locked --version
+`buf-anchor` stage (`cargo install buf-toolchain --locked --version
 1.69.0`), copies `buf` into the musl builder, runs `buf --version`, then
 compiles the plugin.
 
 From the repository root:
 
-```bash
+```shell
 cargo xtask docker
 ```
 
 That builds `protobuf-mdbook:local` for `linux/amd64` and smoke-tests
 `--version`, image user, entrypoint, and platform. Plain build:
 
-```bash
+```shell
 docker build --platform linux/amd64 -t protobuf-mdbook:local -f Dockerfile .
 docker run --rm --entrypoint /protoc-gen-mdbook protobuf-mdbook:local --version
 ```
@@ -540,10 +542,10 @@ preprocessor setup are left to you (see
 
 Other tools that generate mdBook documentation from protobuf:
 
-- [**mdbook-protobuf**](https://github.com/zakhenry/mdbook-protobuf) — mdBook
-  **preprocessor** that builds reference docs from a `FileDescriptorSet` on disk
+- [mdbook-protobuf](https://github.com/zakhenry/mdbook-protobuf), an mdBook
+  preprocessor that builds reference docs from a `FileDescriptorSet` on disk
   (configure `proto_descriptor` in `book.toml`; runs during `mdbook build` /
   `mdbook serve`).
-- [**protoc-gen-mdbook**](https://github.com/matze/protoc-gen-mdbook) (matze) —
-  earlier **protoc plugin** with a similar name; generates mdBook pages from
+- [protoc-gen-mdbook](https://github.com/matze/protoc-gen-mdbook) (matze),
+  an earlier protoc plugin with a similar name. It generates mdBook pages from
   `.proto` files via `protoc --mdbook_out`.
