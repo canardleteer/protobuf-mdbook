@@ -22,7 +22,7 @@ mdbook-mermaid = "0.17.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
-buffa = { version = "0.6.0", default-features = false, features = ["std"] }
+buffa = { version = "0.8.0", default-features = false, features = ["std"] }
 buffa-descriptor = { version = "0.6.0", default-features = false, features = ["std"] }
 mdbook-core = "=0.5.3"
 mdbook-driver = "=0.5.3"
