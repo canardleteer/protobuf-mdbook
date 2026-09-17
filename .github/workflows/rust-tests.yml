@@ -1,4 +1,4 @@
-# CI: rustfmt, clippy, tests, and example generation via `cargo xtask ci`.
+# CI: rustfmt, clippy, tests, and example generation via `cargo xtask check`.
 name: rust-tests
 
 on:
@@ -46,7 +46,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           # Single workspace at repo root; default ". -> target" is correct.
-          # shared-key lets ci/docker/pages reuse deps on the same host triple.
+          # shared-key lets check/image/pages reuse deps on the same host triple.
           shared-key: cargo
           cache-on-failure: true
           # Don't cache ~/.cargo/bin: rust-cache may strip binaries while
@@ -54,8 +54,8 @@ jobs:
           cache-bin: false
       - name: Install Buf CLI
         uses: ./.github/actions/install-toolchain
-      - name: cargo xtask ci
-        run: cargo xtask ci
+      - name: cargo xtask check
+        run: cargo xtask check
 
   docker:
     runs-on: ubuntu-latest
@@ -70,11 +70,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           # Single workspace at repo root; default ". -> target" is correct.
-          # shared-key lets ci/docker/pages reuse deps on the same host triple.
+          # shared-key lets check/image/pages reuse deps on the same host triple.
           shared-key: cargo
           cache-on-failure: true
           cache-bin: false
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-      - name: docker build and smoke test
-        run: cargo xtask docker
+      - name: image build and smoke test
+        run: cargo xtask image --engine docker

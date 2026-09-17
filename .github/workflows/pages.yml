@@ -35,7 +35,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           # Single workspace at repo root; default ". -> target" is correct.
-          # shared-key lets ci/docker/pages reuse deps on the same host triple.
+          # shared-key lets check/image/pages reuse deps on the same host triple.
           shared-key: cargo
           cache-on-failure: true
           # Don't cache ~/.cargo/bin: rust-cache may strip binaries while

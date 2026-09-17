@@ -1,4 +1,4 @@
-//! CI helpers: fmt, clippy, test, toolchain, buf, coverage.
+//! Write-format, toolchain, buf, rumdl, and golden-refresh helpers.
 
 use crate::workspace::{WORKSPACE_ROOT, cargo};
 use anyhow::{Context, Result, bail};
@@ -6,45 +6,8 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn fmt() -> Result<()> {
-    cargo_fmt(&[])?;
+    cargo(&["fmt", "--all"])?;
     buf_format()
-}
-
-pub fn fmt_check() -> Result<()> {
-    cargo_fmt(&["--check"])?;
-    buf_format_check()
-}
-
-fn cargo_fmt(extra: &[&str]) -> Result<()> {
-    let mut args = vec![
-        "fmt",
-        "-p",
-        "protobuf-mdbook",
-        "-p",
-        "protobuf-mdbook-xtask",
-        "--",
-    ];
-    args.extend_from_slice(extra);
-    cargo(&args)
-}
-
-pub fn clippy() -> Result<()> {
-    cargo(&[
-        "clippy",
-        "--locked",
-        "-p",
-        "protobuf-mdbook",
-        "-p",
-        "protobuf-mdbook-xtask",
-        "--all-targets",
-        "--",
-        "-D",
-        "warnings",
-    ])
-}
-
-pub fn test() -> Result<()> {
-    cargo(&["test", "--locked", "-p", "protobuf-mdbook"])
 }
 
 pub fn update_golden() -> Result<()> {
@@ -83,13 +46,11 @@ pub fn release_bin(name: &str) -> Result<std::path::PathBuf> {
 }
 
 pub fn buf_command() -> Result<()> {
-    let status = Command::new("buf")
+    let output = Command::new("buf")
         .arg("--version")
-        .status()
+        .output()
         .context("spawn buf (--version)")?;
-    if status.success() {
-        Ok(())
-    } else {
+    if !output.status.success() {
         bail!(
             "buf CLI not found or failed; install with \
              `cargo install buf-toolchain --locked --version {}` \
@@ -97,6 +58,23 @@ pub fn buf_command() -> Result<()> {
             protobuf_mdbook::BUF_TOOLCHAIN_VERSION
         );
     }
+    let version = String::from_utf8_lossy(&output.stdout);
+    let version = version.trim();
+    eprintln!("{version}");
+    let expected_cli = buf_cli_version_from_toolchain_pin(protobuf_mdbook::BUF_TOOLCHAIN_VERSION);
+    if !version.contains(expected_cli) {
+        eprintln!(
+            "xtask: warning: buf --version ({version}) does not match \
+             toolchain pin {expected_cli} (buf-toolchain {})",
+            protobuf_mdbook::BUF_TOOLCHAIN_VERSION
+        );
+    }
+    Ok(())
+}
+
+/// `buf-toolchain` crate versions track Buf CLI semver, with optional `-rc` / `-hotfix` suffixes.
+fn buf_cli_version_from_toolchain_pin(pin: &str) -> &str {
+    pin.split_once('-').map(|(base, _)| base).unwrap_or(pin)
 }
 
 fn examples_proto() -> std::path::PathBuf {
@@ -105,6 +83,10 @@ fn examples_proto() -> std::path::PathBuf {
 
 pub fn buf_lint() -> Result<()> {
     buf_command()?;
+    buf_lint_after_probe()
+}
+
+pub fn buf_lint_after_probe() -> Result<()> {
     let proto_root = examples_proto();
     let status = Command::new("buf")
         .current_dir(&proto_root)
@@ -135,6 +117,10 @@ pub fn buf_format() -> Result<()> {
 
 pub fn buf_format_check() -> Result<()> {
     buf_command()?;
+    buf_format_check_after_probe()
+}
+
+pub fn buf_format_check_after_probe() -> Result<()> {
     let proto_root = examples_proto();
     let status = Command::new("buf")
         .current_dir(&proto_root)
@@ -278,44 +264,17 @@ pub fn check_toolchain(strict: bool) -> Result<()> {
     Ok(())
 }
 
-fn ensure_cargo_llvm_cov() -> Result<()> {
-    let status = Command::new("cargo")
-        .args(["llvm-cov", "--version"])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .context("cargo llvm-cov --version")?;
-    if status.success() {
-        return Ok(());
-    }
-    bail!(
-        "cargo llvm-cov not found; install with: cargo install cargo-llvm-cov --locked\n\
-         also run: rustup component add llvm-tools-preview"
-    );
-}
+#[cfg(test)]
+mod tests {
+    use super::buf_cli_version_from_toolchain_pin;
 
-pub fn coverage(open: bool, lcov: bool, output_path: &Path) -> Result<()> {
-    ensure_cargo_llvm_cov()?;
-    let mut args = vec![
-        "llvm-cov",
-        "--locked",
-        "-p",
-        "protobuf-mdbook",
-        "--all-targets",
-    ];
-    if open {
-        args.push("--open");
-    } else if lcov {
-        args.extend(["--lcov", "--output-path"]);
-        args.push(output_path.to_str().context("lcov output path utf8")?);
-    } else {
-        args.push("--html");
-    }
-    let result = cargo(&args);
-    if result.is_err() {
-        eprintln!(
-            "hint: if llvm-cov failed to find tools, run: rustup component add llvm-tools-preview"
+    #[test]
+    fn buf_cli_version_strips_prerelease_suffix() {
+        assert_eq!(buf_cli_version_from_toolchain_pin("1.73.0-rc.1"), "1.73.0");
+        assert_eq!(
+            buf_cli_version_from_toolchain_pin("1.72.0-hotfix.2"),
+            "1.72.0"
         );
+        assert_eq!(buf_cli_version_from_toolchain_pin("1.69.0"), "1.69.0");
     }
-    result
 }
