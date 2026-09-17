@@ -9,7 +9,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use walkdir::WalkDir;
 
-pub(crate) const BUF_INSTALL_HINT: &str = "cargo install buf-toolchain --locked --version 1.69.0";
+/// Pinned `buf-toolchain` crate version (`workspace.metadata.protobuf-mdbook.toolchain.buf`).
+pub const BUF_TOOLCHAIN_VERSION: &str = "1.73.0-rc.1";
+
+pub(crate) const BUF_INSTALL_HINT: &str =
+    "cargo install buf-toolchain --locked --version 1.73.0-rc.1";
 
 pub fn compile_with_buf(args: &ResolveArgs) -> Result<ResolvedInput> {
     if args.inputs.is_empty() {
@@ -142,4 +146,23 @@ fn tool_exists(name: &str) -> bool {
             .status()
             .ok()
             .is_some_and(|s| s.success())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BUF_TOOLCHAIN_VERSION;
+
+    #[test]
+    fn toolchain_version_matches_workspace_metadata() {
+        let cargo_toml = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"));
+        let expected = format!("buf = \"{BUF_TOOLCHAIN_VERSION}\"");
+        assert!(
+            cargo_toml.contains(&expected),
+            "Cargo.toml workspace.metadata.protobuf-mdbook.toolchain.buf must be {BUF_TOOLCHAIN_VERSION}"
+        );
+        assert!(
+            super::BUF_INSTALL_HINT.contains(BUF_TOOLCHAIN_VERSION),
+            "BUF_INSTALL_HINT must name {BUF_TOOLCHAIN_VERSION}"
+        );
+    }
 }

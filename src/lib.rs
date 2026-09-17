@@ -59,6 +59,9 @@ pub fn mdbook_version() -> &'static str {
     mdbook_core::MDBOOK_VERSION
 }
 
+/// Pinned `buf-toolchain` crate version (`workspace.metadata.protobuf-mdbook.toolchain.buf`).
+pub use input::BUF_TOOLCHAIN_VERSION;
+
 /// Generate output files from descriptors and plugin options.
 pub fn generate_from_input(input: &GenerateInput) -> Result<Vec<(String, String)>> {
     if input.file_to_generate.is_empty() {

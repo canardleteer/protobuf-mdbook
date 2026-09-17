@@ -11,7 +11,7 @@ use crate::plugin_api::FileDescriptorProto;
 use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 
-pub use buf::{compile_with_buf, resolve_buf_path};
+pub use buf::{BUF_TOOLCHAIN_VERSION, compile_with_buf, resolve_buf_path};
 pub use fds::{load_descriptor_set, read_request_stdin};
 pub use merge::{filter_file_to_generate, merge_proto_files};
 pub use protoc::{compile_with_protoc, resolve_protoc_path};
