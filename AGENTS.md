@@ -1,11 +1,28 @@
 # Contributor guide for `protobuf-mdbook` and `protoc-gen-mdbook`
 
+For work under `xtask/`, also read and follow [`xtask/AGENTS.md`](xtask/AGENTS.md).
+
+## Development tasks
+
+- Use `cargo xtask check` as the canonical local quality command. `cargo xtask ci`
+  is the same command. Keep CI, workflows, and scripts aligned with its registered
+  steps. Do not make the xtask inspect a CI provider declaration.
+- Adopted handles: `check` / `ci`, `image` (alias `docker`), `coverage`, and
+  `coverage-open`. `profile` is omitted (no established workload). `mcp-test` is
+  omitted (no stdio MCP server).
+- Prefer `cargo xtask` over new Python scripts for typed, cross-platform,
+  Cargo-aware development orchestration. Inspect overlapping Python scripts and
+  propose a migration, but obtain user approval before replacing a mature script
+  or changing callers. This repository has no retained Python orchestration.
+- When an xtask command needs async I/O or concurrency, `tokio` and `tracing`
+  are appropriate. Leave synchronous commands synchronous.
+
 ## Toolchain
 
 - Rust is pinned in `rust-toolchain.toml` (exact stable channel, not rolling
   `stable`). Bump the pin there when you advance the compiler.
 - CI installs the pin via `dtolnay/rust-toolchain@1.96.0` (matches `rust-toolchain.toml`).
-  `cargo xtask ci` runs `check-toolchain --strict` first. Locally, run
+  `cargo xtask check` runs `toolchain` (`check-toolchain --strict`) first. Locally, run
   `cargo xtask check-toolchain` to warn on drift. Use `--strict` to fail.
 
 ## Documentation Style Guide (markdown files)
@@ -63,7 +80,7 @@ These patterns are common in hard-to-read text and erode trust with technical re
   `protobuf_mdbook::mdbook_version()` in the library).
 - Do not duplicate the mdBook version number in README, AGENTS, or comments.
   Refer readers to `Cargo.toml` and `--version` instead.
-- To bump the pin, edit `Cargo.toml` only and run `cargo xtask ci`. Integration tests
+- To bump the pin, edit `Cargo.toml` only and run `cargo xtask check`. Integration tests
   assert `--version` includes `mdbook_version()`; no manual doc version edits required.
 
 ## mdBook public API (prefer over reimplementation)
@@ -126,7 +143,7 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
   `cel-10.js`, `*.meta.json`, `NOTICE`). Use them as the spec when porting rules to Rust.
 - Runtime highlighter: [`src/highlight/`](src/highlight/) (`protobuf.rs`, `cel.rs`).
 - `check-highlight-rust` runs golden HTML parity in `tests/fixtures/highlight/` (part of
-  `cargo xtask ci`). Refresh with `cargo xtask update-highlight-golden` after intentional
+  `cargo xtask check`). Refresh with `cargo xtask update-highlight-golden` after intentional
   grammar edits.
 
 ## Examples and output
@@ -134,16 +151,20 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
 - Authoritative example protos: `examples/proto/` (Buf module; BSR dep
   `buf.build/bufbuild/protovalidate` in `buf.yaml` / `buf.lock`, never vendored
   in-repo). `buf lint` / `buf format` resolve deps via Buf; protoc runs export on demand.
-- Format locally with `cargo xtask fmt` (`cargo fmt` + `buf format -w`). CI uses `fmt-check`
-  (`cargo fmt --check` + `buf format --diff`) and `buf lint` (Buf CLI on PATH; CI installs
-  1.73.0-rc.1 via `cargo install buf-toolchain --locked --version 1.73.0-rc.1`). Shared helper
+- Format locally with `cargo xtask fmt` (`cargo fmt --all` + `buf format -w`). CI uses the
+  `fmt` check step (`cargo fmt --all -- --check` + `buf format --diff`) and `buf-lint`
+  (Buf CLI on PATH; CI installs 1.73.0-rc.1 via
+  `cargo install buf-toolchain --locked --version 1.73.0-rc.1`). Shared helper
   `proto_deps::ensure_proto_deps_export` writes gitignored `target/proto-deps/` for protoc
   `-I` only. Never pass exported files as inputs (`cargo xtask book-*` and link-check tests
   call it automatically).
 - Canonical protoc inputs live in [`src/examples.rs`](src/examples.rs) (`EXAMPLE_PROTO_INPUTS`),
   shared by `cargo xtask book-*`, integration tests, and link-check. The list excludes exported
   `buf/validate/validate.proto`. Update the list when adding fixture protos under `acme/`.
-- Generated book at `./api-book/` (gitignored). CI runs `cargo xtask book-init --markdown-only` then `book-links`. Local preview uses `book-init` once, then `book-refresh`. Guided tasks accept `--generator protoc` (default, CI) or `--generator cli` (`protobuf-mdbook` + Buf on `examples/proto/`).
+- Generated book at `./api-book/` (gitignored). The `check` gate runs markdown-only
+  `book-init` then `book-links`. Local preview uses `book-init` once, then `book-refresh`.
+  Guided tasks accept `--generator protoc` (default, CI) or `--generator cli`
+  (`protobuf-mdbook` + Buf on `examples/proto/`).
 
 ## Output conventions
 
@@ -235,7 +256,7 @@ Generated `./api-book/` pages are not rumdl-formatted in CI; validate with `carg
 From the repository root:
 
 ```shell
-cargo xtask ci   # includes buf-lint and fmt-check (proto format via buf format --diff)
+cargo xtask check
 ```
 
 Human spot-check (full mdBook at repo root):
@@ -264,10 +285,10 @@ run `protobuf-mdbook` instead. `book-refresh` passes `book=` and
   `mirrored_fixture_backends`, `run_examples`, `run_fixture`).
 - Golden output regression: `tests/output_regression.rs`. Refresh baselines with
   `cargo xtask update-golden`.
-- Required gate: `cargo xtask book-links` (part of `ci`, after `book-init --markdown-only`).
+- Required gate: `cargo xtask book-links` (part of `check`, after markdown-only `book-init`).
 - When you iterate on markdown output, run `cargo xtask book-init --markdown-only`, then `cargo xtask book-links`.
-- Local coverage: `cargo xtask coverage --open` (requires `cargo install cargo-llvm-cov --locked`
-  and `rustup component add llvm-tools-preview`; not part of `ci`).
+- Local coverage: `cargo xtask coverage --open` (requires `cargo install --locked cargo-llvm-cov`
+  and `rustup component add llvm-tools-preview`; not part of `check`).
 
 ## Protoc plugin contract
 
@@ -286,12 +307,14 @@ run `protobuf-mdbook` instead. `book-refresh` passes `book=` and
 
 ## CI
 
-- Local and GitHub Actions both run `cargo xtask ci` (see `.github/workflows/rust-tests.yml`).
+- Local and GitHub Actions both run `cargo xtask check` (see `.github/workflows/rust-tests.yml`).
+  `cargo xtask ci` is the same command.
 - CI installs `dtolnay/rust-toolchain@1.96.0` with `components: rustfmt, clippy` (matches `rust-toolchain.toml`).
-  `ci` runs `check-toolchain --strict` before buf lint, fmt-check, and clippy/test.
+  `check` runs `toolchain` (`check-toolchain --strict`) before `buf-lint`, `fmt`, `check`,
+  clippy, and test.
 - CI installs Buf CLI 1.73.0-rc.1 with `cargo install buf-toolchain --locked --version 1.73.0-rc.1`.
-  `ci` runs `buf-lint` and `fmt-check` (includes `buf format --diff` on `examples/proto/`).
+  `check` runs `buf-lint` and `fmt` (includes `buf format --diff` on `examples/proto/`).
 - Matrix covers Linux, macOS, and Windows with `shell: bash`.
-- Docker: `cargo xtask docker` builds the scratch image (`Dockerfile`) and runs
+- Image: `cargo xtask image` builds the scratch image (`Dockerfile`) and runs
   runtime smoke checks (`--version`, non-root user, entrypoint). CI runs the same
-  via the `docker` job (Buildx + `cargo xtask docker`).
+  via the `docker` job (Buildx + `cargo xtask image --engine docker`).

@@ -14,7 +14,8 @@ Buf module for fixture packages under `acme/example/{v1,v2,v3alpha1}/`.
   in this repo. Only the BSR pin in `buf.lock` is checked in.
 - `buf.lock` pins dep commits. Regenerate with `buf dep update` here.
 
-CI runs `buf lint` and `buf format --diff` (via `cargo xtask fmt-check`). Buf resolves
+CI runs `buf lint` and `buf format --diff` (the `buf-lint` and `fmt` steps of
+`cargo xtask check`). Buf resolves
 deps from the module (no export needed). For raw `protoc`, export deps first (`cargo xtask
 book-*` and link-check tests export automatically):
 

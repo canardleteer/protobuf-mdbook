@@ -458,22 +458,24 @@ From the repository root:
 
 | Command | Purpose |
 |---------|---------|
-| `cargo xtask ci` | check-toolchain, `buf-lint`, `fmt-check`, clippy, test, build-plugin, `check-highlight-rust`, `book-init --markdown-only`, `book-links` |
-| `cargo xtask fmt` | `cargo fmt` + `buf format -w` on `examples/proto/` |
-| `cargo xtask fmt-check` | `cargo fmt --check` + `buf format --diff` on `examples/proto/` |
+| `cargo xtask check` | Canonical gate (`ci` is the same command). Default steps: toolchain, `buf-lint`, `fmt`, `check`, clippy, test, build-plugin, highlight-rust, markdown-only `book-init`, `book-links` |
+| `cargo xtask check --only=fmt,clippy` | Run a subset in registry order |
+| `cargo xtask fmt` | `cargo fmt --all` + `buf format -w` on `examples/proto/` |
+| `cargo xtask fmt-check` | Same as `check --only fmt` (`cargo fmt --all -- --check` + `buf format --diff`) |
 | `cargo xtask buf-lint` | `buf lint` on `examples/proto/` (needs [Buf CLI](https://buf.build/docs/cli/installation/); see [`buf.lock`](examples/proto/buf.lock)) |
 | `cargo xtask buf-format` | `buf format -w` on `examples/proto/` only |
 | `cargo xtask buf-format-check` | `buf format --diff` on `examples/proto/` only |
 | `cargo xtask check-toolchain` | Warn if active rustc/components diverge from `rust-toolchain.toml` (`--strict` to fail) |
 | `cargo xtask book-init` | Full mdBook scaffold at `./api-book` (wipes first; run once locally) |
-| `cargo xtask book-init --markdown-only` | Markdown only → `./api-book` (wipes first; what CI uses for link checks) |
+| `cargo xtask book-init --markdown-only` | Markdown only → `./api-book` (wipes first; what `check` uses for link checks) |
 | `cargo xtask book-refresh` | Refresh `./api-book` markdown; passes `book=` to load paths from `book.toml` |
 | `cargo xtask book-links` | Resolve in-page links and mdBook heading anchors in `./api-book/` |
 | `cargo xtask book-build` | `mdbook build` on `./api-book/` |
-| `cargo xtask coverage --open` | LLVM HTML coverage (needs [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov), `llvm-tools-preview`) |
+| `cargo xtask coverage --open` | Fresh LLVM HTML coverage at `target/coverage/llvm-cov/html/index.html` |
+| `cargo xtask coverage-open` | Same as `coverage --open` |
 | `cargo xtask rumdl-fmt` | Format this crate `README.md` (needs `rumdl` on PATH) |
 | `cargo xtask rumdl-check` | Lint root `README.md` with rumdl |
-| `cargo xtask docker` | Build linux/amd64 scratch image + runtime smoke tests |
+| `cargo xtask image` | Build linux/amd64 scratch image + runtime smoke tests (`docker` is the same command) |
 | `cargo xtask check-highlight-rust` | Verify Rust highlighter output vs golden HTML in `tests/fixtures/highlight/` |
 | `cargo xtask update-highlight-golden` | Refresh highlight golden HTML after grammar changes |
 
@@ -522,7 +524,7 @@ compiles the plugin.
 From the repository root:
 
 ```shell
-cargo xtask docker
+cargo xtask image
 ```
 
 That builds `protobuf-mdbook:local` for `linux/amd64` and smoke-tests
