@@ -123,7 +123,7 @@ pub fn write_generated_files(out_root: &Path, pairs: &[(String, String)]) -> Res
 
 /// Decode request bytes, generate documentation, encode response.
 pub fn generate(request_bytes: &[u8]) -> Result<Vec<u8>> {
-    let req = CodeGeneratorRequest::decode_from_slice(request_bytes)
+    let req = crate::plugin_api::decode_descriptor_message::<CodeGeneratorRequest>(request_bytes)
         .map_err(|e| anyhow::anyhow!("decode CodeGeneratorRequest: {e}"))?;
 
     let pairs = generate_from_input(&req.into())?;
