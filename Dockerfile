@@ -1,13 +1,15 @@
 # syntax=docker/dockerfile:1.7
 
-# Pinned Buf CLI for builder sanity checks (`buf --version`), matching `buf-toolchain` 1.69.0.
+# Pinned Buf CLI for builder sanity checks (`buf --version`), matching `buf-toolchain` 1.73.0-rc.1.
 # Runtime image remains `scratch` + static `protoc-gen-mdbook` only.
 
 ARG RUST_VERSION=1.96.0
+ARG BUF_TOOLCHAIN_VERSION=1.73.0-rc.1
 
 FROM rust:${RUST_VERSION}-bookworm AS buf-anchor
 ENV CARGO_HOME=/usr/local/cargo
-RUN cargo install buf-toolchain --locked --version 1.69.0 \
+ARG BUF_TOOLCHAIN_VERSION
+RUN cargo install buf-toolchain --locked --version "${BUF_TOOLCHAIN_VERSION}" \
   && install -m0755 "${CARGO_HOME}/bin/buf" /tmp/buf
 
 FROM rust:${RUST_VERSION}-bookworm AS builder

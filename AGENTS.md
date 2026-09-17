@@ -136,7 +136,7 @@ into `CodeGeneratorResponse` files. Do not hand-copy theme trees.
   in-repo). `buf lint` / `buf format` resolve deps via Buf; protoc runs export on demand.
 - Format locally with `cargo xtask fmt` (`cargo fmt` + `buf format -w`). CI uses `fmt-check`
   (`cargo fmt --check` + `buf format --diff`) and `buf lint` (Buf CLI on PATH; CI installs
-  1.69.0 via `cargo install buf-toolchain --locked --version 1.69.0`). Shared helper
+  1.73.0-rc.1 via `cargo install buf-toolchain --locked --version 1.73.0-rc.1`). Shared helper
   `proto_deps::ensure_proto_deps_export` writes gitignored `target/proto-deps/` for protoc
   `-I` only. Never pass exported files as inputs (`cargo xtask book-*` and link-check tests
   call it automatically).
@@ -289,7 +289,7 @@ run `protobuf-mdbook` instead. `book-refresh` passes `book=` and
 - Local and GitHub Actions both run `cargo xtask ci` (see `.github/workflows/rust-tests.yml`).
 - CI installs `dtolnay/rust-toolchain@1.96.0` with `components: rustfmt, clippy` (matches `rust-toolchain.toml`).
   `ci` runs `check-toolchain --strict` before buf lint, fmt-check, and clippy/test.
-- CI installs Buf CLI 1.69.0 with `cargo install buf-toolchain --locked --version 1.69.0`.
+- CI installs Buf CLI 1.73.0-rc.1 with `cargo install buf-toolchain --locked --version 1.73.0-rc.1`.
   `ci` runs `buf-lint` and `fmt-check` (includes `buf format --diff` on `examples/proto/`).
 - Matrix covers Linux, macOS, and Windows with `shell: bash`.
 - Docker: `cargo xtask docker` builds the scratch image (`Dockerfile`) and runs

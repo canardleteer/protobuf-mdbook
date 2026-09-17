@@ -92,8 +92,9 @@ pub fn buf_command() -> Result<()> {
     } else {
         bail!(
             "buf CLI not found or failed; install with \
-             `cargo install buf-toolchain --locked --version 1.69.0` \
-             (see Dockerfile buf-anchor)"
+             `cargo install buf-toolchain --locked --version {}` \
+             (see Dockerfile buf-anchor)",
+            protobuf_mdbook::BUF_TOOLCHAIN_VERSION
         );
     }
 }

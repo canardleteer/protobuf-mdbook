@@ -70,7 +70,7 @@ only with `--bin protoc-gen-mdbook`, `--bin protobuf-mdbook`, or
 - **`buf` compiler:** `protobuf-mdbook` uses
   [buf](https://github.com/bufbuild/buf) by default. Install it with
   [`buf-toolchain`](https://github.com/canardleteer/buf-rs):
-  - `cargo install buf-toolchain`
+  - `cargo install buf-toolchain --locked --version 1.73.0-rc.1`
     ([repo](https://github.com/canardleteer/buf-rs)).
 - **`protoc` compiler:** also available. You install and maintain `protoc`
   yourself.
@@ -516,7 +516,7 @@ Contributor details: [`AGENTS.md`](AGENTS.md).
 Container runtime images are `scratch` plus the static `protoc-gen-mdbook`
 binary only (non-root `nobody` user). The [`Dockerfile`](Dockerfile) uses a
 `buf-anchor` stage (`cargo install buf-toolchain --locked --version
-1.69.0`), copies `buf` into the musl builder, runs `buf --version`, then
+1.73.0-rc.1`), copies `buf` into the musl builder, runs `buf --version`, then
 compiles the plugin.
 
 From the repository root:
